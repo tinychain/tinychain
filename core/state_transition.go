@@ -75,6 +75,10 @@ func (st *StateTransition) gas() uint64 {
 	return st.tx.GasLimit
 }
 
+func (st *StateTransition) gasPrice() uint64 {
+	return st.tx.GasPrice
+}
+
 func (st *StateTransition) value() *big.Int {
 	return st.tx.Value
 }
@@ -96,7 +100,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	} else {
 		// Call contract
 		st.statedb.SetNonce(st.from().Address(), st.statedb.GetNonce(st.from().Address())+1)
-		ret, leftGas, vmerr = st.evm.Call(st.from(), st.to().Address(), st.data(), MaxGas, st.value())
+		ret, leftGas, vmerr = st.evm.Call(st.from(), st.to().Address(), st.data(), st.gas(), st.value())
 	}
 	if vmerr != nil {
 		log.Errorf("VM returned with error %s", vmerr)
@@ -107,6 +111,10 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	gasUsed := st.gas() - leftGas
 	//st.statedb.SubBalance(st.from().Address(), new(big.Int).SetUint64(gasUsed))
 	//st.statedb.AddBalance(st.evm.Coinbase, new(big.Int).SetUint64(gasUsed))
+	balance := st.statedb.GetBalance(st.from().Address())
+	if balance.Cmp(new(big.Int).SetUint64(gasUsed*st.gasPrice())) < 0 {
+		// balance not enough
+	}
 
 	return ret, gasUsed, vmerr != nil, nil
 }

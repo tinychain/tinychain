@@ -29,7 +29,7 @@ func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 	for _, tx := range block.Transactions {
 		receipt, err := ApplyTransaction(sp.bc, nil, sp.statedb, header, tx)
 		if err != nil {
-			return nil, nil
+			return nil, err
 		}
 		receipts = append(receipts, receipt)
 	}

@@ -10,7 +10,7 @@ import (
  */
 
 type AppendBlockEvent struct {
-	Blocks []*types.Block
+	Blocks types.Blocks
 }
 
 /*
@@ -23,7 +23,7 @@ type NewBlockEvent struct {
 type BlockBroadcastEvent struct{}
 
 type BlockCommitEvent struct {
-	Height *big.Int
+	Heights []*big.Int
 }
 
 type ExecBlockEvent struct {

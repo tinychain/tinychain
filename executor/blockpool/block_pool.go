@@ -9,13 +9,15 @@ import (
 	"github.com/pkg/errors"
 	"tinychain/common"
 	batcher "github.com/yyh1102/go-batcher"
+	"sort"
 )
 
 var (
 	log = common.GetLogger("blockpool")
 
-	ErrBlockDuplicate = errors.New("block duplicate")
-	ErrPoolFull       = errors.New("block pool is full")
+	ErrBlockDuplicate  = errors.New("block duplicate")
+	ErrPoolFull        = errors.New("block pool is full")
+	ErrBlockFallbehind = errors.New("block falls behind the current chain")
 )
 
 type BlockValidator interface {
@@ -24,11 +26,13 @@ type BlockValidator interface {
 }
 
 type Blockchain interface {
+	LastBlock() *types.Block
 }
 
 type BlockPool struct {
 	config    *Config
 	mu        sync.RWMutex
+	chain     Blockchain                // current blockchain
 	validator BlockValidator            // Block validator
 	valid     map[*big.Int]*types.Block // Valid blocks pool. map[height]*block
 	batch     *batcher.Batch            // Batch for blocks launching
@@ -61,6 +65,7 @@ func NewBlockPool(config *Config, validator BlockValidator) *BlockPool {
 func (bp *BlockPool) Start() {
 
 	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
+	bp.commitSub = bp.event.Subscribe(&core.BlockCommitEvent{})
 	go bp.listen()
 }
 
@@ -72,7 +77,7 @@ func (bp *BlockPool) listen() {
 			go bp.add(block)
 		case ev := <-bp.commitSub.Chan():
 			commit := ev.(*core.BlockCommitEvent)
-			go bp.del(commit.Height)
+			go bp.delBlocks(commit.Heights)
 		case <-bp.quitCh:
 			bp.blockSub.Unsubscribe()
 			return
@@ -83,10 +88,12 @@ func (bp *BlockPool) listen() {
 // launch implements cbFunc in batcher.
 // It will be invoked and post a batch of valid blocks when reaches batch size or timeout.
 func (bp *BlockPool) launch(batch []interface{}) {
-	var blocks []*types.Block
+	var blocks types.Blocks
 	for _, item := range batch {
 		blocks = append(blocks, item.(*types.Block))
 	}
+	// sort blocks by height-asec-order
+	sort.Sort(blocks)
 	appendBlockEv := &core.AppendBlockEvent{
 		Blocks: blocks,
 	}
@@ -107,11 +114,14 @@ func (bp *BlockPool) add(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	// Check block duplicate
-	if old := bp.valid[block.Height()]; old != nil {
-		// TODO Check can be replace or not?
-		return ErrBlockDuplicate
+	old := bp.valid[block.Height()]
+	if old != nil {
+		// Replace the old block if new one has a higher gasused
+		if old.Hash() != block.Hash() && old.GasUsed() > block.GasUsed() {
+			return ErrBlockDuplicate
+		}
 	}
-	if bp.Size() >= bp.config.MaxBlockSize {
+	if bp.Size() >= bp.config.MaxBlockSize && old == nil {
 		return ErrPoolFull
 	}
 
@@ -125,6 +135,9 @@ func (bp *BlockPool) add(block *types.Block) error {
 }
 
 func (bp *BlockPool) validate(block *types.Block) error {
+	if block.Height().Cmp(bp.chain.LastBlock().Height()) < 0 {
+		return ErrBlockFallbehind
+	}
 	err := bp.validator.ValidateHeader(block)
 	if err != nil {
 		log.Errorf("Error occurs when validating block header whose height is %s, %s", block.Height(), err)
@@ -139,11 +152,13 @@ func (bp *BlockPool) validate(block *types.Block) error {
 	return nil
 }
 
-// Clear picks up the invalid blocks in the pool and removes them.
-func (bp *BlockPool) del(height *big.Int) {
+// delBlocks remove the blocks with given height.
+func (bp *BlockPool) delBlocks(heights []*big.Int) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
-	delete(bp.valid, height)
+	for _, height := range heights {
+		delete(bp.valid, height)
+	}
 }
 
 // Size gets the size of valid blocks.

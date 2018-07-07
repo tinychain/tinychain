@@ -82,6 +82,10 @@ func (tp *TxPool) listen() {
 	}
 }
 
+func (tp *TxPool) Stop() {
+	close(tp.quitCh)
+}
+
 func (tp *TxPool) launch(batch []interface{}) {
 	go tp.event.Post(&core.ExecPendingTxEvent{
 		Txs: tp.Pending(),

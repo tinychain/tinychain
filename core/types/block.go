@@ -91,6 +91,8 @@ func (bl *Block) StateRoot() common.Hash    { return bl.Header.StateRoot }
 func (bl *Block) Coinbase() common.Address  { return bl.Header.Coinbase }
 func (bl *Block) Extra() []byte             { return bl.Header.Extra }
 func (bl *Block) Time() *big.Int            { return bl.Header.Time }
+func (bl *Block) GasUsed() uint64           { return bl.Header.GasUsed }
+func (bl *Block) GasLimit() uint64          { return bl.Header.GasLimit }
 
 // Calculate hash of block
 // Combine header hash and transactions hash, and sha256 it
@@ -127,3 +129,17 @@ func (bl *Block) Size() uint64 {
 func (bl *Block) Serialize() ([]byte, error) { return json.Marshal(bl) }
 
 func (bl *Block) Deserialize(d []byte) error { return json.Unmarshal(d, bl) }
+
+type Blocks []*Block
+
+func (blks Blocks) Len() int {
+	return len(blks)
+}
+
+func (blks Blocks) Less(i, j int) bool {
+	return blks[i].Height().Cmp(blks[j].Height()) < 0
+}
+
+func (blks Blocks) Swap(i, j int) {
+	blks[i], blks[j] = blks[j], blks[i]
+}

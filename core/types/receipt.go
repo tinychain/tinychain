@@ -50,3 +50,11 @@ func (rps Receipts) Hash() common.Hash {
 	root, _ := bmt.Hash(receiptSet)
 	return root
 }
+
+func (rps Receipts) Serialize() ([]byte, error) {
+	return json.Marshal(rps)
+}
+
+func (rps Receipts) Deserialize(d []byte) error {
+	return json.Unmarshal(d, &rps)
+}

@@ -30,7 +30,7 @@ const (
 )
 
 var (
-	log    = common.GetLogger("tinydb")
+	log = common.GetLogger("tinydb")
 )
 
 // TinyDB stores and manages blockchain data
@@ -57,7 +57,6 @@ func (tdb *TinyDB) GetWorldState() (common.Hash, error) {
 func (tdb *TinyDB) GetLastBlock() (*types.Block, error) {
 	data, err := tdb.db.Get([]byte(KeyLastBlock))
 	if err != nil {
-		log.Errorf("Cannot find last block, %s", err)
 		return nil, err
 	}
 	block := &types.Block{}
@@ -69,7 +68,6 @@ func (tdb *TinyDB) PutLastBlock(block *types.Block) error {
 	data, _ := block.Serialize()
 	err := tdb.db.Put([]byte(KeyLastBlock), data)
 	if err != nil {
-		log.Errorf("Failed to put block, %s", block)
 		return err
 	}
 	return nil
@@ -78,7 +76,6 @@ func (tdb *TinyDB) PutLastBlock(block *types.Block) error {
 func (tdb *TinyDB) GetLastHeader() (*types.Header, error) {
 	data, err := tdb.db.Get([]byte(KeyLastHeader))
 	if err != nil {
-		log.Errorf("Cannot find last header, %s", err)
 		return nil, err
 	}
 	header := &types.Header{}
@@ -90,7 +87,6 @@ func (tdb *TinyDB) PutLastHeader(header *types.Header) error {
 	data, _ := header.Serialize()
 	err := tdb.db.Put([]byte(KeyLastHeader), data)
 	if err != nil {
-		log.Errorf("Failed to put last header, %s", err)
 		return err
 	}
 	return nil
@@ -100,7 +96,6 @@ func (tdb *TinyDB) GetHash(height *big.Int) (common.Hash, error) {
 	var hash common.Hash
 	data, err := tdb.db.Get([]byte("h" + height.String() + "n"))
 	if err != nil {
-		log.Errorf("Cannot find block header hash with height %s", height)
 		return hash, err
 	}
 	hash = common.DecodeHash(data)
@@ -110,7 +105,6 @@ func (tdb *TinyDB) GetHash(height *big.Int) (common.Hash, error) {
 func (tdb *TinyDB) PutHash(height *big.Int, hash common.Hash) error {
 	err := tdb.db.Put([]byte("h"+height.String()+"n"), hash[:])
 	if err != nil {
-		log.Errorf("Failed to put hash, %s", err)
 		return err
 	}
 	return nil
@@ -119,7 +113,6 @@ func (tdb *TinyDB) PutHash(height *big.Int, hash common.Hash) error {
 func (tdb *TinyDB) GetHeader(height *big.Int, hash common.Hash) (*types.Header, error) {
 	data, err := tdb.db.Get([]byte("h" + height.String() + hash.String()))
 	if err != nil {
-		log.Errorf("Cannot find header with height %s and hash %s", height, hash)
 		return nil, err
 	}
 	header := types.Header{}
@@ -131,7 +124,6 @@ func (tdb *TinyDB) PutHeader(header *types.Header) error {
 	data, _ := header.Serialize()
 	err := tdb.db.Put([]byte("h"+header.Height.String()+header.Hash().String()), data)
 	if err != nil {
-		log.Errorf("Failed to put header, %s", err)
 		return err
 	}
 	return nil
@@ -159,7 +151,6 @@ func (tdb *TinyDB) PutHeader(header *types.Header) error {
 func (tdb *TinyDB) GetHeight(hash common.Hash) (*big.Int, error) {
 	data, err := tdb.db.Get([]byte("H" + hash.String()))
 	if err != nil {
-		log.Errorf("Cannot find height with hash %s", hash.Hex())
 		return nil, err
 	}
 	return new(big.Int).SetBytes(data), nil
@@ -168,7 +159,6 @@ func (tdb *TinyDB) GetHeight(hash common.Hash) (*big.Int, error) {
 func (tdb *TinyDB) PutHeight(hash common.Hash, height *big.Int) error {
 	err := tdb.db.Put([]byte("H"+hash.String()), height.Bytes())
 	if err != nil {
-		log.Errorf("Failed to put height with hash %s", hash.Hex())
 		return err
 	}
 	return nil
@@ -177,7 +167,6 @@ func (tdb *TinyDB) PutHeight(hash common.Hash, height *big.Int) error {
 func (tdb *TinyDB) GetBlock(height *big.Int, hash common.Hash) (*types.Block, error) {
 	data, err := tdb.db.Get([]byte("b" + height.String() + hash.String()))
 	if err != nil {
-		log.Errorf("Cannot find block with height %s and hash %s", height, hash.Hex())
 		return nil, err
 	}
 	block := types.Block{}
@@ -191,19 +180,31 @@ func (tdb *TinyDB) PutBlock(block *types.Block) error {
 	data, _ := block.Serialize()
 	err := tdb.db.Put([]byte("b"+height.String()+hash.String()), data)
 	if err != nil {
-		log.Errorf("Failed to put block with height %s", height)
 		return err
 	}
 	return nil
 }
 
-//func (tdb *TinyDB) GerReceipts(height *big.Int, hash common.Hash) (*types.Receipts, error) {
-//
-//}
-//
-//func (tdb *TinyDB) PutReceipts(height *big.Int, hash common.Hash, receipt *types.Receipt) error {
-//
-//}
+func (tdb *TinyDB) GerReceipts(height *big.Int, hash common.Hash) (types.Receipts, error) {
+	data, err := tdb.db.Get([]byte("r" + height.String() + hash.String()))
+	if err != nil {
+		return nil, err
+	}
+	var receipts types.Receipts
+	err = receipts.Deserialize(data)
+	if err != nil {
+		return nil, err
+	}
+	return receipts, nil
+}
+
+func (tdb *TinyDB) PutReceipts(height *big.Int, hash common.Hash, receipt types.Receipt) error {
+	data, err := receipt.Serialize()
+	if err != nil {
+		return err
+	}
+	return tdb.db.Put([]byte("r"+height.String()+hash.String()), data)
+}
 
 func (tdb *TinyDB) GetTxMeta(txHash common.Hash) (*types.TxMeta, error) {
 	data, err := tdb.db.Get([]byte("l" + txHash.String()))

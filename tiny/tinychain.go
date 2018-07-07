@@ -15,8 +15,8 @@ var (
 	log = common.GetLogger("tinychain")
 )
 
-// Tinychain implements the tinychain full node service
-type Tinychain struct {
+// Tiny implements the tinychain full node service
+type Tiny struct {
 	config *Config
 
 	eventHub *event.TypeMux
@@ -36,7 +36,7 @@ type Tinychain struct {
 	pm *ProtocolManager
 }
 
-func New(config *Config) (*Tinychain, error) {
+func New(config *Config) (*Tiny, error) {
 	eventHub := event.GetEventhub()
 
 	ldb, err := leveldb.NewLDBDataBase("tinychain")
@@ -58,7 +58,7 @@ func New(config *Config) (*Tinychain, error) {
 		return nil, err
 	}
 
-	return &Tinychain{
+	return &Tiny{
 		config:   config,
 		eventHub: eventHub,
 		db:       tinyDB,
@@ -70,15 +70,14 @@ func New(config *Config) (*Tinychain, error) {
 	}, nil
 }
 
-func (chain *Tinychain) Start() {
+func (chain *Tiny) Start() error{
 	// Collect protocols and register in the protocol manager
 
 	// start network
 	err := chain.network.Start()
 }
 
-func (chain *Tinychain) Stop() {
+func (chain *Tiny) Stop() {
 	chain.eventHub.Stop()
 	chain.network.Stop()
-
 }
