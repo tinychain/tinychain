@@ -5,17 +5,20 @@ import (
 	"tinychain/core/state"
 	"tinychain/common"
 	"tinychain/core/vm"
+	"tinychain/consensus"
 )
 
 type StateProcessor struct {
 	bc      *Blockchain
 	statedb *state.StateDB
+	engine  consensus.Engine
 }
 
-func NewStateProcessor(bc *Blockchain, statedb *state.StateDB) *StateProcessor {
+func NewStateProcessor(bc *Blockchain, statedb *state.StateDB, engine consensus.Engine) *StateProcessor {
 	return &StateProcessor{
 		bc:      bc,
 		statedb: statedb,
+		engine:  engine,
 	}
 }
 
@@ -33,7 +36,8 @@ func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 		}
 		receipts = append(receipts, receipt)
 	}
-	// TODO Finalize block
+	sp.engine.Finalize(block.Header, sp.statedb, block.Transactions, receipts)
+
 	return receipts, nil
 }
 

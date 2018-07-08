@@ -160,7 +160,7 @@ func (txs Transactions) Commit(db *leveldb.LDBDatabase) error {
 // contains the index of transacitons in a certain block
 type TxMeta struct {
 	Hash    common.Hash `json:"block_hash"`
-	Height  *big.Int    `json:"height"`
+	Height  uint64      `json:"height"`
 	TxIndex uint64      `json:"tx_index"`
 }
 

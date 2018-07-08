@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/hex"
 	"github.com/libp2p/go-libp2p-crypto"
+	"encoding/binary"
 )
 
 func Hex(b []byte) []byte {
@@ -30,4 +31,14 @@ func GenAddrByPubkey(key crypto.PubKey) (Address, error) {
 func GenAddrByPrivkey(key crypto.PrivKey) (Address, error) {
 	pubkey := key.GetPublic()
 	return GenAddrByPubkey(pubkey)
+}
+
+func Uint2Bytes(v uint64) []byte {
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, v)
+	return b[:]
+}
+
+func Bytes2Uint(d []byte) uint64 {
+	return binary.BigEndian.Uint64(d)
 }

@@ -46,7 +46,7 @@ func (n BNonce) SetBytes(b []byte) {
 
 type Header struct {
 	ParentHash   common.Hash    `json:"parent_hash"`  // Hash of parent block
-	Height       *big.Int       `json:"height"`       // Block height
+	Height       uint64         `json:"height"`       // Block height
 	StateRoot    common.Hash    `json:"state_root"`   // State root
 	TxRoot       common.Hash    `json:"tx_root"`      // Transaction tree root
 	ReceiptsHash common.Hash    `json:"receipt_hash"` // Receipts hash
@@ -70,7 +70,6 @@ func (hd *Header) Desrialize(d []byte) error { return json.Unmarshal(d, hd) }
 type Block struct {
 	Header       *Header      `json:"header"`
 	Transactions Transactions `json:"transactions"`
-	Receipts     Receipts     `json:"receipts"`
 	hash         atomic.Value // Header hash cache
 	size         atomic.Value // Block size cache
 }
@@ -86,7 +85,7 @@ func NewBlock(header *Header, txs Transactions) *Block {
 func (bl *Block) TxRoot() common.Hash       { return bl.Header.TxRoot }
 func (bl *Block) ReceiptsHash() common.Hash { return bl.Header.ReceiptsHash }
 func (bl *Block) ParentHash() common.Hash   { return bl.Header.ParentHash }
-func (bl *Block) Height() *big.Int          { return bl.Header.Height }
+func (bl *Block) Height() uint64            { return bl.Header.Height }
 func (bl *Block) StateRoot() common.Hash    { return bl.Header.StateRoot }
 func (bl *Block) Coinbase() common.Address  { return bl.Header.Coinbase }
 func (bl *Block) Extra() []byte             { return bl.Header.Extra }
@@ -100,18 +99,10 @@ func (bl *Block) Hash() common.Hash {
 	if hash := bl.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
-	// Compute transaction tree hash root
-	//txSet := bmt.WriteSet{}
-	//for _, tx := range bl.Transactions {
-	//	txSet[tx.Hash().String()] = tx.Hash().Bytes()
-	//}
-	root := bl.Transactions.Hash()
-
-	bl.Header.TxRoot = root
-
-	// Compute receipts hash root
-	bl.Header.ReceiptsHash = bl.Receipts.Hash()
-
+	if bl.Header.TxRoot.Nil(){
+		root := bl.Transactions.Hash()
+		bl.Header.TxRoot = root
+	}
 	hash := bl.Header.Hash()
 	bl.hash.Store(hash)
 	return hash
@@ -137,7 +128,7 @@ func (blks Blocks) Len() int {
 }
 
 func (blks Blocks) Less(i, j int) bool {
-	return blks[i].Height().Cmp(blks[j].Height()) < 0
+	return blks[i].Height() < blks[j].Height()
 }
 
 func (blks Blocks) Swap(i, j int) {

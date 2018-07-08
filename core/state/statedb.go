@@ -29,18 +29,18 @@ type StateDB struct {
 	stateObjectsDirty map[common.Address]struct{}     // dirty state objects
 }
 
-func New(db *leveldb.LDBDatabase, root []byte) *StateDB {
+func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 	tree := bmt.NewBucketTree(db)
 	if err := tree.Init(root); err != nil {
 		log.Errorf("Failed to init bucket tree when new state db, %s", err)
-		return nil
+		return nil, err
 	}
 	return &StateDB{
 		db:                newCacheDB(db),
 		bmt:               tree,
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
-	}
+	}, nil
 }
 
 // Get state object from cache and bucket tree

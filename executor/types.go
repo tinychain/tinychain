@@ -4,13 +4,6 @@ import (
 	"tinychain/core/types"
 )
 
-// Validator validate the block info
-type Validator interface {
-	BlockValidator
-	TxValidator
-	StateValidator
-}
-
 type TxValidator interface {
 	ValidateTxs(txs types.Transactions) (types.Transactions, types.Transactions)
 	ValidateTx(tx *types.Transaction) error
@@ -21,8 +14,6 @@ type StateValidator interface {
 }
 
 type BlockValidator interface {
-	// Validate block header
 	ValidateHeader(block *types.Block) error
-	// Validate block body, including transactions, receipts
-	ValidateBody(block *types.Block) error
+	ValidateBody(block *types.Block, receipts types.Receipts) error
 }

@@ -2,9 +2,9 @@ package db
 
 import (
 	"tinychain/common"
-	"math/big"
 	"tinychain/core/types"
 	"tinychain/db/leveldb"
+	"strconv"
 )
 
 /*
@@ -26,7 +26,6 @@ import (
 const (
 	KeyLastHeader = "LastHeader"
 	KeyLastBlock  = "LastBlock"
-	KeyWorldState = "WorldState"
 )
 
 var (
@@ -46,55 +45,41 @@ func (tdb *TinyDB) LDB() *leveldb.LDBDatabase {
 	return tdb.db
 }
 
-func (tdb *TinyDB) GetWorldState() (common.Hash, error) {
-	data, err := tdb.db.Get([]byte(KeyWorldState))
+func (tdb *TinyDB) GetLastBlock() (common.Hash, error) {
+	data, err := tdb.db.Get([]byte(KeyLastBlock))
 	if err != nil {
 		return common.Hash{}, err
 	}
 	return common.BytesToHash(data), nil
 }
 
-func (tdb *TinyDB) GetLastBlock() (*types.Block, error) {
-	data, err := tdb.db.Get([]byte(KeyLastBlock))
-	if err != nil {
-		return nil, err
-	}
-	block := &types.Block{}
-	block.Deserialize(data)
-	return block, nil
-}
-
-func (tdb *TinyDB) PutLastBlock(block *types.Block) error {
-	data, _ := block.Serialize()
-	err := tdb.db.Put([]byte(KeyLastBlock), data)
+func (tdb *TinyDB) PutLastBlock(hash common.Hash) error {
+	err := tdb.db.Put([]byte(KeyLastBlock), hash.Bytes())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tdb *TinyDB) GetLastHeader() (*types.Header, error) {
+func (tdb *TinyDB) GetLastHeader() (common.Hash, error) {
 	data, err := tdb.db.Get([]byte(KeyLastHeader))
 	if err != nil {
-		return nil, err
+		return common.Hash{}, err
 	}
-	header := &types.Header{}
-	header.Desrialize(data)
-	return header, nil
+	return common.BytesToHash(data), nil
 }
 
-func (tdb *TinyDB) PutLastHeader(header *types.Header) error {
-	data, _ := header.Serialize()
-	err := tdb.db.Put([]byte(KeyLastHeader), data)
+func (tdb *TinyDB) PutLastHeader(hash common.Hash) error {
+	err := tdb.db.Put([]byte(KeyLastHeader), hash.Bytes())
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tdb *TinyDB) GetHash(height *big.Int) (common.Hash, error) {
+func (tdb *TinyDB) GetHash(height uint64) (common.Hash, error) {
 	var hash common.Hash
-	data, err := tdb.db.Get([]byte("h" + height.String() + "n"))
+	data, err := tdb.db.Get([]byte("h" + strconv.FormatUint(height, 10) + "n"))
 	if err != nil {
 		return hash, err
 	}
@@ -102,16 +87,16 @@ func (tdb *TinyDB) GetHash(height *big.Int) (common.Hash, error) {
 	return hash, nil
 }
 
-func (tdb *TinyDB) PutHash(height *big.Int, hash common.Hash) error {
-	err := tdb.db.Put([]byte("h"+height.String()+"n"), hash[:])
+func (tdb *TinyDB) PutHash(height uint64, hash common.Hash) error {
+	err := tdb.db.Put([]byte("h"+strconv.FormatUint(height, 10)+"n"), hash[:])
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tdb *TinyDB) GetHeader(height *big.Int, hash common.Hash) (*types.Header, error) {
-	data, err := tdb.db.Get([]byte("h" + height.String() + hash.String()))
+func (tdb *TinyDB) GetHeader(height uint64, hash common.Hash) (*types.Header, error) {
+	data, err := tdb.db.Get([]byte("h" + strconv.FormatUint(height, 10) + hash.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +107,7 @@ func (tdb *TinyDB) GetHeader(height *big.Int, hash common.Hash) (*types.Header, 
 
 func (tdb *TinyDB) PutHeader(header *types.Header) error {
 	data, _ := header.Serialize()
-	err := tdb.db.Put([]byte("h"+header.Height.String()+header.Hash().String()), data)
+	err := tdb.db.Put([]byte("h"+strconv.FormatUint(header.Height, 10)+header.Hash().String()), data)
 	if err != nil {
 		return err
 	}
@@ -148,24 +133,24 @@ func (tdb *TinyDB) PutHeader(header *types.Header) error {
 //	return nil
 //}
 
-func (tdb *TinyDB) GetHeight(hash common.Hash) (*big.Int, error) {
+func (tdb *TinyDB) GetHeight(hash common.Hash) (uint64, error) {
 	data, err := tdb.db.Get([]byte("H" + hash.String()))
 	if err != nil {
-		return nil, err
+		return 0, err
 	}
-	return new(big.Int).SetBytes(data), nil
+	return common.Bytes2Uint(data), nil
 }
 
-func (tdb *TinyDB) PutHeight(hash common.Hash, height *big.Int) error {
-	err := tdb.db.Put([]byte("H"+hash.String()), height.Bytes())
+func (tdb *TinyDB) PutHeight(hash common.Hash, height uint64) error {
+	err := tdb.db.Put([]byte("H"+hash.String()), common.Uint2Bytes(height))
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tdb *TinyDB) GetBlock(height *big.Int, hash common.Hash) (*types.Block, error) {
-	data, err := tdb.db.Get([]byte("b" + height.String() + hash.String()))
+func (tdb *TinyDB) GetBlock(height uint64, hash common.Hash) (*types.Block, error) {
+	data, err := tdb.db.Get([]byte("b" + strconv.FormatUint(height, 10) + hash.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -175,18 +160,18 @@ func (tdb *TinyDB) GetBlock(height *big.Int, hash common.Hash) (*types.Block, er
 }
 
 func (tdb *TinyDB) PutBlock(block *types.Block) error {
-	height := block.Header.Height
-	hash := block.Header.Hash()
+	height := block.Height()
+	hash := block.Hash()
 	data, _ := block.Serialize()
-	err := tdb.db.Put([]byte("b"+height.String()+hash.String()), data)
+	err := tdb.db.Put([]byte("b"+strconv.FormatUint(height, 10)+hash.String()), data)
 	if err != nil {
 		return err
 	}
 	return nil
 }
 
-func (tdb *TinyDB) GerReceipts(height *big.Int, hash common.Hash) (types.Receipts, error) {
-	data, err := tdb.db.Get([]byte("r" + height.String() + hash.String()))
+func (tdb *TinyDB) GerReceipts(height uint64, hash common.Hash) (types.Receipts, error) {
+	data, err := tdb.db.Get([]byte("r" + strconv.FormatUint(height, 10) + hash.String()))
 	if err != nil {
 		return nil, err
 	}
@@ -198,12 +183,12 @@ func (tdb *TinyDB) GerReceipts(height *big.Int, hash common.Hash) (types.Receipt
 	return receipts, nil
 }
 
-func (tdb *TinyDB) PutReceipts(height *big.Int, hash common.Hash, receipt types.Receipt) error {
+func (tdb *TinyDB) PutReceipts(height uint64, hash common.Hash, receipt types.Receipt) error {
 	data, err := receipt.Serialize()
 	if err != nil {
 		return err
 	}
-	return tdb.db.Put([]byte("r"+height.String()+hash.String()), data)
+	return tdb.db.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data)
 }
 
 func (tdb *TinyDB) GetTxMeta(txHash common.Hash) (*types.TxMeta, error) {

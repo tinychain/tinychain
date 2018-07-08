@@ -2,16 +2,11 @@ package core
 
 import (
 	"tinychain/core/types"
-	"math/big"
 )
 
 /*
 	Blockchain events
  */
-
-type AppendBlockEvent struct {
-	Blocks types.Blocks
-}
 
 /*
 	Block events
@@ -23,11 +18,15 @@ type NewBlockEvent struct {
 type BlockBroadcastEvent struct{}
 
 type BlockCommitEvent struct {
-	Heights []*big.Int
+	Height uint64
 }
 
 type ExecBlockEvent struct {
 	Block *types.Block
+}
+
+type ExecFinishEvent struct {
+	Res bool // exec result.If success,set true
 }
 
 /*

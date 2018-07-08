@@ -41,13 +41,17 @@ func New(config *Config) (*Tiny, error) {
 
 	ldb, err := leveldb.NewLDBDataBase("tinychain")
 	if err != nil {
-		log.Errorf("Cannot create db, %s", err)
+		log.Errorf("Cannot create db, err:%s", err)
 		return nil, err
 	}
 	// Create tiny db
 	tinyDB := db.NewTinyDB(ldb)
 	// Create state db
-	statedb := state.New(ldb, nil)
+	statedb, err := state.New(ldb, nil)
+	if err != nil {
+		log.Errorf("cannot init state, err:%s", err)
+		return nil, err
+	}
 
 	network := NewNetwork(config.p2p)
 	engine := consensus.New()
@@ -70,7 +74,7 @@ func New(config *Config) (*Tiny, error) {
 	}, nil
 }
 
-func (chain *Tiny) Start() error{
+func (chain *Tiny) Start() error {
 	// Collect protocols and register in the protocol manager
 
 	// start network

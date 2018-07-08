@@ -5,11 +5,9 @@ import (
 	"tinychain/event"
 	"tinychain/core/types"
 	"tinychain/core"
-	"math/big"
-	"github.com/pkg/errors"
+	"errors"
 	"tinychain/common"
-	batcher "github.com/yyh1102/go-batcher"
-	"sort"
+	"time"
 )
 
 var (
@@ -17,56 +15,45 @@ var (
 
 	ErrBlockDuplicate  = errors.New("block duplicate")
 	ErrPoolFull        = errors.New("block pool is full")
-	ErrBlockFallbehind = errors.New("block falls behind the current chain")
 )
-
-type BlockValidator interface {
-	ValidateHeader(block *types.Block) error
-	ValidateBody(block *types.Block) error
-}
 
 type Blockchain interface {
 	LastBlock() *types.Block
+	AddBlocks(blocks types.Blocks) error
 }
 
 type BlockPool struct {
 	config    *Config
 	mu        sync.RWMutex
-	chain     Blockchain                // current blockchain
-	validator BlockValidator            // Block validator
-	valid     map[*big.Int]*types.Block // Valid blocks pool. map[height]*block
-	batch     *batcher.Batch            // Batch for blocks launching
+	chain     Blockchain              // Current blockchain
+	valid     map[uint64]*types.Block // Valid blocks pool. map[height]*block
+	nextBlkCh chan *types.Block       // Next block to process
 	event     *event.TypeMux
 	quitCh    chan struct{}
 
-	blockSub  event.Subscription
-	commitSub event.Subscription // Receive msg when new blocks are appended to blockchain
+	blockSub event.Subscription
+	commitSub event.Subscription
 }
 
-func NewBlockPool(config *Config, validator BlockValidator) *BlockPool {
+func NewBlockPool(config *Config) *BlockPool {
 	bp := &BlockPool{
 		config:    config,
 		event:     event.GetEventhub(),
-		validator: validator,
-		valid:     make(map[*big.Int]*types.Block, config.MaxBlockSize),
+		valid:     make(map[uint64]*types.Block, config.MaxBlockSize),
+		nextBlkCh: make(chan *types.Block, config.MaxBlockSize),
+		quitCh:    make(chan struct{}),
 	}
 
-	batch := batcher.NewBatch(
-		"APPEND_VALID_BLOCK",
-		config.BatchCapacity,
-		config.BatchTimeout,
-		bp.launch,
-	)
-
-	bp.batch = batch
 	return bp
 }
 
 func (bp *BlockPool) Start() {
-
 	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
-	bp.commitSub = bp.event.Subscribe(&core.BlockCommitEvent{})
+	bp.commitSub=bp.event.Subscribe(&core.BlockCommitEvent{})
+
 	go bp.listen()
+	go bp.watch()
+	go bp.launch()
 }
 
 func (bp *BlockPool) listen() {
@@ -75,9 +62,6 @@ func (bp *BlockPool) listen() {
 		case ev := <-bp.blockSub.Chan():
 			block := ev.(*core.NewBlockEvent).Block
 			go bp.add(block)
-		case ev := <-bp.commitSub.Chan():
-			commit := ev.(*core.BlockCommitEvent)
-			go bp.delBlocks(commit.Heights)
 		case <-bp.quitCh:
 			bp.blockSub.Unsubscribe()
 			return
@@ -85,19 +69,36 @@ func (bp *BlockPool) listen() {
 	}
 }
 
-// launch implements cbFunc in batcher.
-// It will be invoked and post a batch of valid blocks when reaches batch size or timeout.
-func (bp *BlockPool) launch(batch []interface{}) {
-	var blocks types.Blocks
-	for _, item := range batch {
-		blocks = append(blocks, item.(*types.Block))
+// launch
+func (bp *BlockPool) launch() {
+	for {
+		select {
+		case next := <-bp.nextBlkCh:
+			go bp.event.Post(&core.ExecBlockEvent{
+				Block: next,
+			})
+		case <-bp.quitCh:
+			return
+		}
 	}
-	// sort blocks by height-asec-order
-	sort.Sort(blocks)
-	appendBlockEv := &core.AppendBlockEvent{
-		Blocks: blocks,
+}
+
+// watch watches the block valid pool, and post next block to process
+func (bp *BlockPool) watch() {
+	timer := time.NewTicker(bp.config.WatchInterval)
+	for {
+		select {
+		case <-timer.C:
+			lastHeight := bp.chain.LastBlock().Height()
+			bp.mu.Lock()
+			if next, ok := bp.valid[lastHeight+1]; ok {
+				bp.nextBlkCh <- next
+			}
+			bp.mu.Unlock()
+		case <-bp.quitCh:
+			return
+		}
 	}
-	go bp.event.Post(appendBlockEv)
 }
 
 func (bp *BlockPool) Valid() []*types.Block {
@@ -125,35 +126,12 @@ func (bp *BlockPool) add(block *types.Block) error {
 		return ErrPoolFull
 	}
 
-	// Validate block
-	if err := bp.validate(block); err != nil {
-		return err
-	}
-
 	bp.valid[block.Height()] = block
 	return nil
 }
 
-func (bp *BlockPool) validate(block *types.Block) error {
-	if block.Height().Cmp(bp.chain.LastBlock().Height()) < 0 {
-		return ErrBlockFallbehind
-	}
-	err := bp.validator.ValidateHeader(block)
-	if err != nil {
-		log.Errorf("Error occurs when validating block header whose height is %s, %s", block.Height(), err)
-		return err
-	}
-
-	err = bp.validator.ValidateBody(block)
-	if err != nil {
-		log.Errorf("Error occurs when validating block body whose height is %s, %s", block.Height(), err)
-		return err
-	}
-	return nil
-}
-
 // delBlocks remove the blocks with given height.
-func (bp *BlockPool) delBlocks(heights []*big.Int) {
+func (bp *BlockPool) delBlocks(heights []uint64) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	for _, height := range heights {

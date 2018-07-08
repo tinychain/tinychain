@@ -8,9 +8,11 @@ import (
 )
 
 var (
-	ErrNonceTooHight = errors.New("nonce too hight")
-	ErrNonceTooLow   = errors.New("nonce too low")
-	MaxGas           = uint64(9999999) // Maximum
+	ErrNonceTooHight    = errors.New("nonce too hight")
+	ErrNonceTooLow      = errors.New("nonce too low")
+	ErrBalanceNotEnough = errors.New("balance not enough")
+
+	MaxGas = uint64(9999999) // Maximum
 )
 
 type StateTransition struct {
@@ -113,7 +115,9 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	//st.statedb.AddBalance(st.evm.Coinbase, new(big.Int).SetUint64(gasUsed))
 	balance := st.statedb.GetBalance(st.from().Address())
 	if balance.Cmp(new(big.Int).SetUint64(gasUsed*st.gasPrice())) < 0 {
-		// balance not enough
+		// TODO:balance not enough
+		log.Errorf("balance not enough for transaction %s", st.tx.Hash().Hex())
+		return nil, gasUsed, false, ErrBalanceNotEnough
 	}
 
 	return ret, gasUsed, vmerr != nil, nil

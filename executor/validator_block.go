@@ -2,14 +2,16 @@ package executor
 
 import (
 	"tinychain/core/types"
-	"math/big"
-	"tinychain/common"
+	"errors"
+)
+
+var (
+	ErrTxRootNotEqual      = errors.New("txs root is not equal")
+	ErrReceiptRootNotEqual = errors.New("receipts root is not equal")
 )
 
 type Blockchain interface {
-	LatestHeight() *big.Int    // Get latest height of blockchain
-	LatestHash() common.Hash   // Get latest block hash
-	LatestBlock() *types.Block // Get latest block
+	LastBlock() *types.Block // Get latest block
 }
 
 type BlockValidatorImpl struct {
@@ -36,5 +38,16 @@ func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 // Validate block txs
 // 1. Validate txs root hash
 // 2. Validate receipts root hash
-func (v *BlockValidatorImpl) ValidateBody(block *types.Block) error {
+func (v *BlockValidatorImpl) ValidateBody(block *types.Block, receipts types.Receipts) error {
+	txRoot := block.Transactions.Hash()
+	if txRoot != block.TxRoot() {
+		return ErrTxRootNotEqual
+	}
+
+	receiptRoot := receipts.Hash()
+	if receiptRoot != block.ReceiptsHash() {
+		return ErrReceiptRootNotEqual
+	}
+
+	return nil
 }
