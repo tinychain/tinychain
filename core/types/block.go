@@ -7,6 +7,7 @@ import (
 	json "github.com/json-iterator/go"
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/libp2p/go-libp2p-crypto"
 )
 
 // BNonce is a 64-bit hash which proves that a sufficient amount of
@@ -70,6 +71,8 @@ func (hd *Header) Desrialize(d []byte) error { return json.Unmarshal(d, hd) }
 type Block struct {
 	Header       *Header      `json:"header"`
 	Transactions Transactions `json:"transactions"`
+	PubKey       []byte       `json:"pub_key"`
+	Signature    []byte       `json:"signature"`
 	hash         atomic.Value // Header hash cache
 	size         atomic.Value // Block size cache
 }
@@ -99,9 +102,8 @@ func (bl *Block) Hash() common.Hash {
 	if hash := bl.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
-	if bl.Header.TxRoot.Nil(){
-		root := bl.Transactions.Hash()
-		bl.Header.TxRoot = root
+	if bl.Header.TxRoot.Nil() {
+		bl.Header.TxRoot = bl.Transactions.Hash()
 	}
 	hash := bl.Header.Hash()
 	bl.hash.Store(hash)
@@ -115,6 +117,20 @@ func (bl *Block) Size() uint64 {
 	tmp, _ := bl.Serialize()
 	bl.size.Store(len(tmp))
 	return uint64(len(tmp))
+}
+
+func (bl *Block) Sign(priv crypto.PrivKey) ([]byte, error) {
+	hash := bl.Hash()
+	s, err := priv.Sign(hash.Bytes())
+	if err != nil {
+		return nil, err
+	}
+	bl.PubKey, err = priv.GetPublic().Bytes()
+	if err != nil {
+		return nil, err
+	}
+	bl.Signature = s
+	return s, nil
 }
 
 func (bl *Block) Serialize() ([]byte, error) { return json.Marshal(bl) }
