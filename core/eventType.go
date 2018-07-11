@@ -29,6 +29,8 @@ type ExecFinishEvent struct {
 	Res bool // exec result.If success,set true
 }
 
+type BlockReadyEvent struct {}
+
 /*
 	Transaction events
  */

@@ -1,5 +1,5 @@
-# Tinchain
-A tiny blockchain
+# WIP
+This project is working in progress. A tiny blockchain
 
 ## Feature
 - Consensus

@@ -3,6 +3,7 @@ package executor
 import (
 	"tinychain/core/types"
 	"errors"
+	"tinychain/common"
 )
 
 var (
@@ -10,16 +11,12 @@ var (
 	ErrReceiptRootNotEqual = errors.New("receipts root is not equal")
 )
 
-type Blockchain interface {
-	LastBlock() *types.Block // Get latest block
-}
-
 type BlockValidatorImpl struct {
 	config *Config
 	chain  Blockchain
 }
 
-func NewBlockValidator(config *Config, chain Blockchain) *BlockValidatorImpl {
+func NewBlockValidator(config *common.Config, chain Blockchain) *BlockValidatorImpl {
 	return &BlockValidatorImpl{
 		config: config,
 		chain:  chain,

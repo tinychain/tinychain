@@ -7,41 +7,33 @@ import (
 	"tinychain/core"
 	"errors"
 	"tinychain/common"
-	"time"
 )
 
 var (
 	log = common.GetLogger("blockpool")
 
-	ErrBlockDuplicate  = errors.New("block duplicate")
-	ErrPoolFull        = errors.New("block pool is full")
+	ErrBlockDuplicate = errors.New("block duplicate")
+	ErrPoolFull       = errors.New("block pool is full")
 )
 
-type Blockchain interface {
-	LastBlock() *types.Block
-	AddBlocks(blocks types.Blocks) error
-}
-
 type BlockPool struct {
-	config    *Config
-	mu        sync.RWMutex
-	chain     Blockchain              // Current blockchain
-	valid     map[uint64]*types.Block // Valid blocks pool. map[height]*block
-	nextBlkCh chan *types.Block       // Next block to process
-	event     *event.TypeMux
-	quitCh    chan struct{}
+	maxBlockSize uint64
+	mu           sync.RWMutex
+	valid        map[uint64]*types.Block // Valid blocks pool. map[height]*block
+	event        *event.TypeMux
+	quitCh       chan struct{}
 
-	blockSub event.Subscription
+	blockSub  event.Subscription
 	commitSub event.Subscription
 }
 
-func NewBlockPool(config *Config) *BlockPool {
+func NewBlockPool(config *common.Config) *BlockPool {
+	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
 	bp := &BlockPool{
-		config:    config,
-		event:     event.GetEventhub(),
-		valid:     make(map[uint64]*types.Block, config.MaxBlockSize),
-		nextBlkCh: make(chan *types.Block, config.MaxBlockSize),
-		quitCh:    make(chan struct{}),
+		maxBlockSize: maxBlockSize,
+		event:        event.GetEventhub(),
+		valid:        make(map[uint64]*types.Block, maxBlockSize),
+		quitCh:       make(chan struct{}),
 	}
 
 	return bp
@@ -49,11 +41,9 @@ func NewBlockPool(config *Config) *BlockPool {
 
 func (bp *BlockPool) Start() {
 	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
-	bp.commitSub=bp.event.Subscribe(&core.BlockCommitEvent{})
+	bp.commitSub = bp.event.Subscribe(&core.BlockCommitEvent{})
 
 	go bp.listen()
-	go bp.watch()
-	go bp.launch()
 }
 
 func (bp *BlockPool) listen() {
@@ -69,38 +59,6 @@ func (bp *BlockPool) listen() {
 	}
 }
 
-// launch
-func (bp *BlockPool) launch() {
-	for {
-		select {
-		case next := <-bp.nextBlkCh:
-			go bp.event.Post(&core.ExecBlockEvent{
-				Block: next,
-			})
-		case <-bp.quitCh:
-			return
-		}
-	}
-}
-
-// watch watches the block valid pool, and post next block to process
-func (bp *BlockPool) watch() {
-	timer := time.NewTicker(bp.config.WatchInterval)
-	for {
-		select {
-		case <-timer.C:
-			lastHeight := bp.chain.LastBlock().Height()
-			bp.mu.Lock()
-			if next, ok := bp.valid[lastHeight+1]; ok {
-				bp.nextBlkCh <- next
-			}
-			bp.mu.Unlock()
-		case <-bp.quitCh:
-			return
-		}
-	}
-}
-
 func (bp *BlockPool) Valid() []*types.Block {
 	var blocks []*types.Block
 	bp.mu.RLock()
@@ -109,6 +67,12 @@ func (bp *BlockPool) Valid() []*types.Block {
 		blocks = append(blocks, block)
 	}
 	return blocks
+}
+
+func (bp *BlockPool) GetBlock(height uint64) *types.Block {
+	bp.mu.RLock()
+	defer bp.mu.RUnlock()
+	return bp.valid[height]
 }
 
 func (bp *BlockPool) add(block *types.Block) error {
@@ -122,11 +86,12 @@ func (bp *BlockPool) add(block *types.Block) error {
 			return ErrBlockDuplicate
 		}
 	}
-	if bp.Size() >= bp.config.MaxBlockSize && old == nil {
+	if bp.Size() >= bp.maxBlockSize && old == nil {
 		return ErrPoolFull
 	}
 
 	bp.valid[block.Height()] = block
+	go bp.event.Post(&core.BlockReadyEvent{})
 	return nil
 }
 

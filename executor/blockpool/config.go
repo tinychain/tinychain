@@ -1,10 +1,15 @@
 package blockpool
 
-import "time"
+import (
+	"tinychain/common"
+)
 
 type Config struct {
 	MaxBlockSize  uint64 // Maximum number of blocks
-	BatchTimeout  time.Duration
-	BatchCapacity int
-	WatchInterval time.Duration		// Interval for watching pool
+}
+
+func newConfig(config *common.Config) *Config {
+	return &Config{
+		MaxBlockSize:  uint64(config.GetInt64("max_block_size")),
+	}
 }
