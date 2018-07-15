@@ -1,14 +1,13 @@
 package consensus
 
 import (
-	"tinychain/consensus/dpos"
+	"tinychain/consensus/dpos_bft"
 	"tinychain/core/types"
 	"tinychain/common"
 	"tinychain/core/state"
 )
 
 type Engine interface {
-	Name() string
 	Start() error
 	Stop() error
 	Finalize(header *types.Header, state *state.StateDB, txs types.Transactions, receipts types.Receipts) (*types.Block, error)
@@ -23,5 +22,5 @@ type TxPool interface {
 }
 
 func New() Engine {
-	return dpos.NewDpos()
+	return dpos_bft.NewDpos()
 }

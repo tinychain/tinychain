@@ -25,23 +25,25 @@ func NewStateProcessor(bc *Blockchain, statedb *state.StateDB, engine consensus.
 // Process apply transaction in state
 func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 	var (
-		receipts types.Receipts
-		header   = block.Header
+		receipts     types.Receipts
+		totalGasUsed uint64
+		header       = block.Header
 	)
 
 	for _, tx := range block.Transactions {
-		receipt, err := ApplyTransaction(sp.bc, nil, sp.statedb, header, tx)
+		receipt, gasUsed, err := ApplyTransaction(sp.bc, nil, sp.statedb, header, tx)
 		if err != nil {
 			return nil, err
 		}
 		receipts = append(receipts, receipt)
+		totalGasUsed += gasUsed
 	}
-	sp.engine.Finalize(block.Header, sp.statedb, block.Transactions, receipts)
+	block.Header.GasUsed = totalGasUsed
 
 	return receipts, nil
 }
 
-func ApplyTransaction(bc *Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction) (*types.Receipt, error) {
+func ApplyTransaction(bc *Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction) (*types.Receipt, uint64, error) {
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(tx, header, bc, author)
 	// Create a new environment which holds all relevant information
@@ -50,12 +52,12 @@ func ApplyTransaction(bc *Blockchain, author *common.Address, statedb *state.Sta
 	// Apply the tx to current state
 	_, gasUsed, failed, err := ApplyTx(vmenv, tx)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	// Get intermediate root of current state
 	root, err := statedb.IntermediateRoot()
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	receipt := types.NewRecipet(root, failed, tx.Hash(), gasUsed)
 	if tx.To.Nil() {
@@ -63,5 +65,5 @@ func ApplyTransaction(bc *Blockchain, author *common.Address, statedb *state.Sta
 		receipt.SetContractAddress(common.CreateAddress(tx.From, tx.Nonce))
 	}
 
-	return receipt, nil
+	return receipt, gasUsed, nil
 }

@@ -196,12 +196,11 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 			"block #%d cannot be added into blockchain because its previous block height is #%d",
 			block.Height(), last.Height()))
 	}
-	return bc.Commit(block)
+	return bc.commit(block)
 }
 
-// Commit the blockchain to db.
-// It returns valid block height and error if any.
-func (bc *Blockchain) Commit(block *types.Block) error {
+// commit persist the block to db.
+func (bc *Blockchain) commit(block *types.Block) error {
 	// Commit block to db
 	if err := bc.db.PutBlock(block); err != nil {
 		log.Errorf("failed to commit block %s to db, err:%s", block.Hash(), err)
@@ -213,6 +212,7 @@ func (bc *Blockchain) Commit(block *types.Block) error {
 		log.Errorf("failed to put last block hash to db, err:%s", err)
 		return err
 	}
+
 	return nil
 }
 

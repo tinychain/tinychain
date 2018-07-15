@@ -23,8 +23,7 @@ type BlockPool struct {
 	event        *event.TypeMux
 	quitCh       chan struct{}
 
-	blockSub  event.Subscription
-	commitSub event.Subscription
+	blockSub event.Subscription // Subscribe new block received from p2p
 }
 
 func NewBlockPool(config *common.Config) *BlockPool {
@@ -41,7 +40,6 @@ func NewBlockPool(config *common.Config) *BlockPool {
 
 func (bp *BlockPool) Start() {
 	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
-	bp.commitSub = bp.event.Subscribe(&core.BlockCommitEvent{})
 
 	go bp.listen()
 }
@@ -91,16 +89,25 @@ func (bp *BlockPool) add(block *types.Block) error {
 	}
 
 	bp.valid[block.Height()] = block
-	go bp.event.Post(&core.BlockReadyEvent{})
+	go bp.event.Post(&core.BlockReadyEvent{block.Height()})
 	return nil
 }
 
-// delBlocks remove the blocks with given height.
-func (bp *BlockPool) delBlocks(heights []uint64) {
+// DelBlock removes the block with given height.
+func (bp *BlockPool) DelBlock(height uint64) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
-	for _, height := range heights {
-		delete(bp.valid, height)
+	delete(bp.valid, height)
+}
+
+// ClearByHeight removes the block whose height is lower than the given height
+func (bp *BlockPool) Clear(height uint64) {
+	bp.mu.Lock()
+	defer bp.mu.Unlock()
+	for h := range bp.valid {
+		if height >= h {
+			delete(bp.valid, h)
+		}
 	}
 }
 

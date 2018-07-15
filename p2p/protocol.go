@@ -21,26 +21,6 @@ type Protocol interface {
 	Error(error)
 }
 
-//// Handler implements protocol
-//type Handler struct {
-//	// Typ should match the message type
-//	typ string
-//
-//	// Run func handles the message from the stream
-//	run func(message *pb.Message) error
-//
-//	// Error func handles the error returned from the stream
-//	error func(error)
-//}
-//
-//func (h *Handler) String() string {
-//	return fmt.Sprintf("P2P Handler %s", h.Type())
-//}
-//
-//func (h *Handler) Type() string {
-//	return h.typ
-//}
-
 func (p *Peer) AddProtocol(proto Protocol) error {
 	if protocols, exist := p.protocols.Load(proto.Type()); exist {
 		protocols := protocols.([]Protocol)

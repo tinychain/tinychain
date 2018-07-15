@@ -181,7 +181,7 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 	return sdb.bmt.Process()
 }
 
-func (sdb *StateDB) Commit() error {
+func (sdb *StateDB) Commit() (common.Hash, error) {
 	dirtySet := bmt.NewWriteSet()
 
 	for addr := range sdb.stateObjectsDirty {
@@ -200,10 +200,10 @@ func (sdb *StateDB) Commit() error {
 	}
 
 	if err := sdb.bmt.Prepare(dirtySet); err != nil {
-		return err
+		return common.Hash{}, err
 	}
 	if err := sdb.bmt.Commit(); err != nil {
-		return err
+		return common.Hash{}, err
 	}
-	return nil
+	return sdb.bmt.Hash(), nil
 }

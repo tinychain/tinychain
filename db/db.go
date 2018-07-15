@@ -183,8 +183,8 @@ func (tdb *TinyDB) GerReceipts(height uint64, hash common.Hash) (types.Receipts,
 	return receipts, nil
 }
 
-func (tdb *TinyDB) PutReceipts(height uint64, hash common.Hash, receipt types.Receipt) error {
-	data, err := receipt.Serialize()
+func (tdb *TinyDB) PutReceipts(height uint64, hash common.Hash, receipts types.Receipts) error {
+	data, err := receipts.Serialize()
 	if err != nil {
 		return err
 	}
@@ -202,16 +202,19 @@ func (tdb *TinyDB) GetTxMeta(txHash common.Hash) (*types.TxMeta, error) {
 	return txMeta, nil
 }
 
-func (tdb *TinyDB) PutTxMetaInBatch(block *types.Block) error {
+// PutTxMetas put transactions' meta to db in batch
+func (tdb *TinyDB) PutTxMetas(txs types.Transactions, hash common.Hash, height uint64) error {
 	batch := tdb.db.NewBatch()
-	for i, tx := range block.Transactions {
+	for i, tx := range txs {
 		txMeta := &types.TxMeta{
-			Hash:    block.Hash(),
-			Height:  block.Height(),
+			Hash:    hash,
+			Height:  height,
 			TxIndex: uint64(i),
 		}
 		data, _ := txMeta.Serialize()
-		batch.Put([]byte("l"+tx.Hash().String()), data)
+		if err := batch.Put([]byte("l"+tx.Hash().String()), data); err != nil {
+			return err
+		}
 	}
 	return batch.Write()
 }

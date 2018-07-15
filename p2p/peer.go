@@ -191,8 +191,6 @@ func (peer *Peer) Stop() {
 func (peer *Peer) ListenMsg() {
 	for {
 		select {
-		case <-peer.quitCh:
-			break
 		case message := <-peer.respCh:
 			//log.Infof("Receive message: Name:%s, data:%s \n", message.Name, message.Data)
 			// Handler run
@@ -201,6 +199,8 @@ func (peer *Peer) ListenMsg() {
 					go proto.Run(message)
 				}
 			}
+		case <-peer.quitCh:
+			break
 		}
 	}
 }
@@ -235,5 +235,7 @@ func (peer *Peer) Multicast(pids []peer.ID, pbName string, data interface{}) {
 		if err != nil {
 			log.Errorf("failed to send %s msg to peer %s, %s", pbName, pid.Pretty(), err)
 		}
+		// move the active pid up ahead of the route bucket
+		go peer.routeTable.update(pid)
 	}
 }

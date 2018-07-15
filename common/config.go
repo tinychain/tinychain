@@ -4,12 +4,12 @@ import (
 	"github.com/spf13/viper"
 	"sync"
 	"fmt"
+	"time"
 )
 
 const (
-	MAX_GAS_LIMIT="max_gas_limit"
-	MAX_BLOCK_SIZE="max_block_size"
-
+	MAX_GAS_LIMIT  = "max_gas_limit"
+	MAX_BLOCK_SIZE = "max_block_size"
 )
 
 type Config struct {
@@ -51,4 +51,16 @@ func (c *Config) GetBool(key string) bool {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.conf.GetBool(key)
+}
+
+func (c *Config) GetInt(key string) int {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.conf.GetInt(key)
+}
+
+func (c *Config) GetDuration(key string) time.Duration {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.conf.GetDuration(key)
 }

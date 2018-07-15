@@ -21,7 +21,7 @@ var (
 
 type BlockPool interface {
 	GetBlock(height uint64) *types.Block
-	DelBlock(height uint64) *types.Block
+	Clear(height uint64)
 }
 
 // Processor represents the interface of block processor
@@ -34,28 +34,37 @@ type Blockchain interface {
 	AddBlock(block *types.Block) error
 }
 
+type Database interface {
+	PutTxMetas(transactions types.Transactions, hash common.Hash, height uint64) error
+	PutReceipts(height uint64, hash common.Hash, receipts types.Receipts) error
+}
+
 type Executor struct {
+	db        Database
 	processor Processor
 	chain     Blockchain     // Blockchain wrapper
 	validator BlockValidator // Block validator
 	batch     batcher.Batch  // Batch for creating new block
 	blockpool BlockPool      // Block pool for new block caching
+	state     *state.StateDB // State db of l
 	engine    consensus.Engine
 	event     *event.TypeMux
 	quitCh    chan struct{}
 
 	processing atomic.Value // Processing state, 1 means processing, 0 means idle
 
-	blockReadySub event.Subscription // Subscribe new block ready event
-	execTxsSub    event.Subscription // Execute pending txs event
+	blockReadySub   event.Subscription // Subscribe new block ready event from block_pool
+	proposeBlockSub event.Subscription // Subscribe propose new block event
+	commitSub       event.Subscription // Subscribe state commit event
 }
 
-func New(config *common.Config, chain *core.Blockchain, statedb *state.StateDB, engine consensus.Engine) *Executor {
+func New(config *common.Config, db Database, chain *core.Blockchain, statedb *state.StateDB, engine consensus.Engine) *Executor {
 	processor := core.NewStateProcessor(chain, statedb, engine)
 	executor := &Executor{
+		db:        db,
 		processor: processor,
 		chain:     chain,
-		validator: NewBlockValidator(config, chain),
+		validator: NewBlockValidator(chain),
 		engine:    engine,
 		event:     event.GetEventhub(),
 		quitCh:    make(chan struct{}),
@@ -66,7 +75,9 @@ func New(config *common.Config, chain *core.Blockchain, statedb *state.StateDB, 
 
 func (ex *Executor) Start() error {
 	ex.blockReadySub = ex.event.Subscribe(&core.ExecBlockEvent{})
-	ex.execTxsSub = ex.event.Subscribe(&core.ExecPendingTxEvent{})
+	ex.proposeBlockSub = ex.event.Subscribe(&core.ProposeBlockEvent{})
+	ex.commitSub = ex.event.Subscribe(&core.CommitBlock{})
+
 	go ex.listen()
 	return nil
 }
@@ -74,13 +85,21 @@ func (ex *Executor) Start() error {
 func (ex *Executor) listen() {
 	for {
 		select {
-		case <-ex.blockReadySub.Chan():
-			go ex.process()
-		case ev := <-ex.execTxsSub.Chan():
-			txs := ev.(*core.ExecPendingTxEvent).Txs
-			go ex.processTx(txs)
+		case ev := <-ex.blockReadySub.Chan():
+			height := ev.(*core.BlockReadyEvent).Height
+			if height == ex.lastHeight()+1 {
+				go ex.process()
+			}
+		case ev := <-ex.proposeBlockSub.Chan():
+			block := ev.(*core.ProposeBlockEvent).Block
+			go ex.proposeBlock(block)
+		case ev := <-ex.commitSub.Chan():
+			block := ev.(*core.CommitBlock).Block
+			go ex.commit(block)
 		case <-ex.quitCh:
-			ex.execTxsSub.Unsubscribe()
+			ex.proposeBlockSub.Unsubscribe()
+			ex.commitSub.Unsubscribe()
+			ex.blockReadySub.Unsubscribe()
 			return
 		}
 	}
@@ -95,64 +114,95 @@ func (ex *Executor) lastHeight() uint64 {
 	return ex.chain.LastBlock().Height()
 }
 
+// processState get the current processing state, and returns 1 processing, or 0 idle
+func (ex *Executor) processState() int {
+	if p := ex.processing.Load(); p != nil {
+		return p.(int)
+	}
+	return 0
+}
+
+// process set a infinite loop to process block in the order of height.
 func (ex *Executor) process() error {
-	if isProcessing := ex.processing.Load(); isProcessing != nil {
-		if isProcessing.(int) == 1 {
-			return nil
-		}
+	isProcessing := ex.processState()
+	if isProcessing == 1 {
+		return nil
 	}
 	ex.processing.Store(1)
+	defer ex.processing.Store(0)
 	for {
-		nextHeight := ex.lastHeight() + 1
-		nextBlk := ex.blockpool.GetBlock(nextHeight)
+		nextBlk := ex.blockpool.GetBlock(ex.lastHeight() + 1)
 		if nextBlk == nil {
 			break
 		}
-		ex.processBlock(nextBlk)
+		if err := ex.processBlock(nextBlk); err != nil {
+			// TODO Roll back, and drop the future blocks
+			return err
+		}
 	}
-	ex.processing.Store(0)
+	ex.blockpool.Clear(ex.lastHeight())
+	return nil
 }
 
+// processBlock process the validation and execution of a received block from other peers
 func (ex *Executor) processBlock(block *types.Block) error {
 	if block.Height() < ex.chain.LastBlock().Height() {
 		return ErrBlockFallbehind
 	}
 	if err := ex.validator.ValidateHeader(block); err != nil {
-		log.Errorf("error occurs when validating block #%d header, err:%s", block.Height(), err)
+		log.Errorf("failed to validate block #%d header, err:%s", block.Height(), err)
 		return err
 	}
 
 	receipts, err := ex.execBlock(block)
 	if err != nil {
-		log.Errorf("error occurs when executing block #%d, err:%s", block.Height(), err)
-	}
-
-	if err := ex.validator.ValidateBody(block, receipts); err != nil {
-		log.Errorf("error occurs when validating block #%d body, err:%s", block.Height(), err)
+		log.Errorf("failed to execute block #%d, err:%s", block.Height(), err)
 		return err
 	}
 
-	if err := ex.chain.AddBlock(block); err != nil {
-
+	if err := ex.validator.ValidateBody(block, receipts); err != nil {
+		log.Errorf("failed to validate block #%d body, err:%s", block.Height(), err)
+		return err
 	}
+
+	if err := ex.persistReceipts(block, receipts); err != nil {
+		log.Errorf("failed to persist receipts, err:%s", err)
+		return err
+	}
+
+	if err := ex.commit(block); err != nil {
+		// TODO: roll back
+		log.Errorf("failed to commit block, err:%s", err)
+		return err
+	}
+
 	return nil
 }
 
+// proposeBlock executes new transactions from tx_pool and pack a new block.
+// The new block is created by consensus engine and does not include state_root, tx_root and receipts_root.
+func (ex *Executor) proposeBlock(block *types.Block) error {
+	receipts, err := ex.execBlock(block)
+	if err != nil {
+		log.Errorf("failed to exec block #%d, err:%s", block.Height(), err)
+		return err
+	}
+
+	if _, err := ex.engine.Finalize(block.Header, ex.state, block.Transactions, receipts); err != nil {
+		log.Errorf("failed to finalize the block #%d, err:%s", block.Height(), err)
+		return err
+	}
+
+	if err := ex.persistReceipts(block, receipts); err != nil {
+		log.Errorf("failed to persist receipts, err:%s", err)
+		return err
+	}
+
+	go ex.event.Post(&core.ConsensusEvent{block})
+	return nil
+}
+
+// execBlock process block in state
 func (ex *Executor) execBlock(block *types.Block) (types.Receipts, error) {
 	return ex.processor.Process(block)
-}
-
-func (ex *Executor) validateBlock() error {
-
-}
-
-func (ex *Executor) genNewBlock(txs types.Transactions, receipts types.Receipts) (*types.Block, error) {
-
-}
-
-// processTx execute transactions launched from tx_pool.
-// 1. Simulate execute every transaction sequentially, until gasUsed reaches blocks's gasLimit
-// 2. Collect valid txs and invalid txs
-// 3. Collect receipts (remove invalid receipts)
-func (ex *Executor) processTx(txs types.Transactions) {
 }

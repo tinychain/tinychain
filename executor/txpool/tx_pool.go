@@ -44,7 +44,7 @@ type TxPool struct {
 	newTxSub event.Subscription
 }
 
-func NewTxPool(config *Config, validator TxValidator, state *state.StateDB) *TxPool {
+func NewTxPool(config *Config, validator TxValidator, state *state.StateDB, useBatch bool) *TxPool {
 	tp := &TxPool{
 		config:       config,
 		validator:    validator,
@@ -54,14 +54,16 @@ func NewTxPool(config *Config, validator TxValidator, state *state.StateDB) *TxP
 		quitCh:       make(chan struct{}, 1),
 	}
 
-	batch := batcher.NewBatch(
-		"NEW_TXS",
-		config.BatchCapacity,
-		config.BatchTimeout,
-		tp.launch,
-	)
+	if useBatch {
+		batch := batcher.NewBatch(
+			"NEW_TXS",
+			config.BatchCapacity,
+			config.BatchTimeout,
+			tp.launch,
+		)
 
-	tp.batch = batch
+		tp.batch = batch
+	}
 	return tp
 }
 
@@ -235,7 +237,7 @@ func (tp *TxPool) activate(addrs []common.Address) {
 			activeTxs = append(activeTxs, tx)
 		}
 	}
-	if len(activeTxs) > 0 {
+	if len(activeTxs) > 0 && tp.batch != nil {
 		tp.postBatch(activeTxs)
 	}
 }

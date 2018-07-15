@@ -17,10 +17,6 @@ type NewBlockEvent struct {
 
 type BlockBroadcastEvent struct{}
 
-type BlockCommitEvent struct {
-	Height uint64
-}
-
 type ExecBlockEvent struct {
 	Block *types.Block
 }
@@ -29,13 +25,31 @@ type ExecFinishEvent struct {
 	Res bool // exec result.If success,set true
 }
 
-type BlockReadyEvent struct {}
+type BlockReadyEvent struct {
+	Height uint64
+}
+
+type ProposeBlockEvent struct {
+	Block *types.Block
+}
+
+type ConsensusEvent struct {
+	Block *types.Block
+}
+
+type CommitBlock struct {
+	Block *types.Block
+}
 
 /*
 	Transaction events
  */
 type NewTxEvent struct {
 	Tx *types.Transaction
+}
+
+type NewTxsEvent struct {
+	Txs types.Transactions
 }
 
 type ExecPendingTxEvent struct {
