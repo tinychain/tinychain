@@ -33,7 +33,7 @@ func (m *ConsensusMsg) Reset()         { *m = ConsensusMsg{} }
 func (m *ConsensusMsg) String() string { return proto.CompactTextString(m) }
 func (*ConsensusMsg) ProtoMessage()    {}
 func (*ConsensusMsg) Descriptor() ([]byte, []int) {
-	return fileDescriptor_message_d53c6bac01217ada, []int{0}
+	return fileDescriptor_message_7986ab16ea70871c, []int{0}
 }
 func (m *ConsensusMsg) XXX_Unmarshal(b []byte) error {
 	return xxx_messageInfo_ConsensusMsg.Unmarshal(m, b)
@@ -88,14 +88,69 @@ func (m *ConsensusMsg) GetSignature() []byte {
 	return nil
 }
 
-func init() {
-	proto.RegisterType((*ConsensusMsg)(nil), "message.consensusMsg")
+type PeerMsg struct {
+	Type                 int32    `protobuf:"varint,1,opt,name=type,proto3" json:"type,omitempty"`
+	Id                   []byte   `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	PubKey               []byte   `protobuf:"bytes,3,opt,name=pubKey,proto3" json:"pubKey,omitempty"`
+	XXX_NoUnkeyedLiteral struct{} `json:"-"`
+	XXX_unrecognized     []byte   `json:"-"`
+	XXX_sizecache        int32    `json:"-"`
 }
 
-func init() { proto.RegisterFile("message.proto", fileDescriptor_message_d53c6bac01217ada) }
+func (m *PeerMsg) Reset()         { *m = PeerMsg{} }
+func (m *PeerMsg) String() string { return proto.CompactTextString(m) }
+func (*PeerMsg) ProtoMessage()    {}
+func (*PeerMsg) Descriptor() ([]byte, []int) {
+	return fileDescriptor_message_7986ab16ea70871c, []int{1}
+}
+func (m *PeerMsg) XXX_Unmarshal(b []byte) error {
+	return xxx_messageInfo_PeerMsg.Unmarshal(m, b)
+}
+func (m *PeerMsg) XXX_Marshal(b []byte, deterministic bool) ([]byte, error) {
+	return xxx_messageInfo_PeerMsg.Marshal(b, m, deterministic)
+}
+func (dst *PeerMsg) XXX_Merge(src proto.Message) {
+	xxx_messageInfo_PeerMsg.Merge(dst, src)
+}
+func (m *PeerMsg) XXX_Size() int {
+	return xxx_messageInfo_PeerMsg.Size(m)
+}
+func (m *PeerMsg) XXX_DiscardUnknown() {
+	xxx_messageInfo_PeerMsg.DiscardUnknown(m)
+}
 
-var fileDescriptor_message_d53c6bac01217ada = []byte{
-	// 154 bytes of a gzipped FileDescriptorProto
+var xxx_messageInfo_PeerMsg proto.InternalMessageInfo
+
+func (m *PeerMsg) GetType() int32 {
+	if m != nil {
+		return m.Type
+	}
+	return 0
+}
+
+func (m *PeerMsg) GetId() []byte {
+	if m != nil {
+		return m.Id
+	}
+	return nil
+}
+
+func (m *PeerMsg) GetPubKey() []byte {
+	if m != nil {
+		return m.PubKey
+	}
+	return nil
+}
+
+func init() {
+	proto.RegisterType((*ConsensusMsg)(nil), "message.consensusMsg")
+	proto.RegisterType((*PeerMsg)(nil), "message.peerMsg")
+}
+
+func init() { proto.RegisterFile("message.proto", fileDescriptor_message_7986ab16ea70871c) }
+
+var fileDescriptor_message_7986ab16ea70871c = []byte{
+	// 189 bytes of a gzipped FileDescriptorProto
 	0x1f, 0x8b, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0xff, 0xe2, 0xe2, 0xcd, 0x4d, 0x2d, 0x2e,
 	0x4e, 0x4c, 0x4f, 0xd5, 0x2b, 0x28, 0xca, 0x2f, 0xc9, 0x17, 0x62, 0x87, 0x72, 0x95, 0x7a, 0x18,
 	0xb9, 0x78, 0x92, 0xf3, 0xf3, 0x8a, 0x53, 0xf3, 0x8a, 0x4b, 0x8b, 0x7d, 0x8b, 0xd3, 0x85, 0x84,
@@ -104,6 +159,8 @@ var fileDescriptor_message_d53c6bac01217ada = []byte{
 	0x47, 0x48, 0x8c, 0x8b, 0x2d, 0x25, 0x33, 0x3d, 0xb5, 0xb8, 0x44, 0x82, 0x59, 0x81, 0x51, 0x83,
 	0x27, 0x08, 0xca, 0x13, 0x92, 0xe1, 0xe2, 0x4c, 0xca, 0xc9, 0x4f, 0xce, 0xf6, 0x48, 0x2c, 0xce,
 	0x90, 0x60, 0x01, 0x4b, 0x21, 0x04, 0x40, 0xb2, 0xc5, 0x99, 0xe9, 0x79, 0x89, 0x25, 0xa5, 0x45,
-	0xa9, 0x12, 0xac, 0x10, 0x59, 0xb8, 0x40, 0x12, 0x1b, 0xd8, 0x79, 0xc6, 0x80, 0x00, 0x00, 0x00,
-	0xff, 0xff, 0x54, 0xe6, 0xc7, 0xb3, 0xaf, 0x00, 0x00, 0x00,
+	0xa9, 0x12, 0xac, 0x10, 0x59, 0xb8, 0x80, 0x92, 0x2b, 0x17, 0x7b, 0x41, 0x6a, 0x6a, 0x11, 0x2e,
+	0x87, 0xf0, 0x71, 0x31, 0x65, 0xa6, 0x80, 0x5d, 0xc1, 0x13, 0xc4, 0x94, 0x99, 0x02, 0x72, 0x42,
+	0x41, 0x69, 0x92, 0x77, 0x6a, 0x25, 0xcc, 0x09, 0x10, 0x5e, 0x12, 0x1b, 0xd8, 0x97, 0xc6, 0x80,
+	0x00, 0x00, 0x00, 0xff, 0xff, 0x91, 0xb0, 0xd7, 0x27, 0xf6, 0x00, 0x00, 0x00,
 }

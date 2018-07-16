@@ -3,6 +3,7 @@ package tiny
 import (
 	"tinychain/p2p"
 	"tinychain/event"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 type Network interface {
@@ -37,6 +38,10 @@ func NewNetwork(config *p2p.Config) Network {
 		event:   event.GetEventhub(),
 		quitCh:  make(chan struct{}),
 	}
+}
+
+func (p *Peer) ID() peer.ID {
+	return p.network.ID()
 }
 
 func (p *Peer) Start() error {

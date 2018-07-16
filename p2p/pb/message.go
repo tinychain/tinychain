@@ -16,10 +16,6 @@ import (
  */
 
 const (
-	OK_MSG         = "ok_msg"
-	ROUTESYNC_REQ  = "routesync_req"
-	ROUTESYNC_RESP = "routesync_resp"
-
 	DATA_LENGTH_SIZE = uint32(4)
 	DATA_MAX_LENGTH  = uint32(4 * 1024 * 1024)
 )
@@ -33,22 +29,6 @@ func NewMessage(name string, data []byte) (*Message, error) {
 		return nil, errors.New("Message data is too long")
 	}
 	return msg, nil
-}
-
-func NewNormalMsg(name string, data *NormalData) (*Message, error) {
-	b, err := proto.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return NewMessage(name, b)
-}
-
-func NewPeerDataMsg(name string, data *PeerData) (*Message, error) {
-	b, err := proto.Marshal(data)
-	if err != nil {
-		return nil, err
-	}
-	return NewMessage(name, b)
 }
 
 //func NewMessage(name string, data MessageData) (*Message, error) {

@@ -6,11 +6,6 @@ message Message {
     bytes data = 2;
 }
 
-// Normal data
-message NormalData {
-    string content = 1;
-}
-
 // Peer info
 message PeerInfo {
     string id = 1;

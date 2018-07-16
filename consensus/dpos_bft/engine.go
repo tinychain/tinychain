@@ -9,6 +9,8 @@ import (
 	"time"
 	"math/big"
 	"sync/atomic"
+	"github.com/libp2p/go-libp2p-crypto"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -29,6 +31,7 @@ type Blockchain interface {
 type Engine struct {
 	config   *Config
 	chain    Blockchain // current blockchain
+	peers    *peerPool
 	bp       *blockProducer
 	bftState atomic.Value
 	event    *event.TypeMux
@@ -38,10 +41,14 @@ type Engine struct {
 	consensusSub event.Subscription // Subscribe kick_off bft event
 }
 
-func NewEngine(config *common.Config, chain Blockchain) (*Engine, error) {
+func NewEngine(config *common.Config, chain Blockchain, id peer.ID) (*Engine, error) {
 	conf := newConfig(config)
+	privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
+	if err != nil {
+		return nil, err
+	}
 	// init block producer info
-	bp, err := newBP(conf)
+	bp, err := newBP(conf, id, privKey)
 	if err != nil {
 		log.Errorf("failed to initialize the info of block producer")
 		return nil, err
@@ -52,6 +59,7 @@ func NewEngine(config *common.Config, chain Blockchain) (*Engine, error) {
 		event:  event.GetEventhub(),
 		bp:     bp,
 		quitCh: make(chan struct{}),
+		peers:  newPeerPool(bp),
 	}, nil
 }
 

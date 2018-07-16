@@ -12,6 +12,7 @@ import (
 	"bufio"
 	"strings"
 	"sync"
+	"tinychain/common"
 )
 
 var (
@@ -232,7 +233,7 @@ func (table *RouteTable) SyncFromPeer(pid peer.ID) error {
 	stream := NewStreamWithPid(pid, table.peer)
 	//}
 
-	return stream.send(pb.ROUTESYNC_REQ, nil)
+	return stream.send(common.ROUTESYNC_REQ, nil)
 }
 
 // Start sync route table looping

@@ -7,7 +7,6 @@ import (
 	libnet "github.com/libp2p/go-libp2p-net"
 	ma "github.com/multiformats/go-multiaddr"
 	pstore "github.com/libp2p/go-libp2p-peerstore"
-	"tinychain/p2p/pb"
 	"time"
 	"github.com/pkg/errors"
 	"tinychain/common"
@@ -98,11 +97,11 @@ type Peer struct {
 	host       *bhost.BasicHost // Local peer host
 	routeTable *RouteTable      // Local route table
 	context    context.Context
-	respCh     chan *pb.Message // Response channel. Receive message from stream.
-	quitCh     chan struct{}    // quit channel
-	protocols  sync.Map         // Handlers of upper layer. map[string][]*Protocol
-	timeout    time.Duration    // Timeout of per connection
-	ready      chan struct{}    // Physical network is ready or not
+	respCh     chan *innerMsg // Response channel. Receive message from stream.
+	quitCh     chan struct{}  // quit channel
+	protocols  sync.Map       // Handlers of upper layer. map[string][]*Protocol
+	timeout    time.Duration  // Timeout of per connection
+	ready      chan struct{}  // Physical network is ready or not
 }
 
 // Creates new peer struct
@@ -116,7 +115,7 @@ func New(config *Config) (*Peer, error) {
 	peer := &Peer{
 		host:    host,
 		context: context.Background(),
-		respCh:  make(chan *pb.Message, MaxRespBufSize),
+		respCh:  make(chan *innerMsg, MaxRespBufSize),
 		quitCh:  make(chan struct{}),
 		timeout: DEFAULT_TIMEOUT,
 		mux:     event.GetEventhub(),
@@ -149,7 +148,7 @@ func (peer *Peer) Connect(pid peer.ID) error {
 }
 
 // Send message to a peer
-func (peer *Peer) Send(pid peer.ID, typ string, data interface{}) error {
+func (peer *Peer) Send(pid peer.ID, typ string, data []byte) error {
 	if pid == peer.ID() {
 		return ErrSendToSelf
 	}
@@ -191,12 +190,12 @@ func (peer *Peer) Stop() {
 func (peer *Peer) ListenMsg() {
 	for {
 		select {
-		case message := <-peer.respCh:
+		case inner := <-peer.respCh:
 			//log.Infof("Receive message: Name:%s, data:%s \n", message.Name, message.Data)
 			// Handler run
-			if protocols, exist := peer.protocols.Load(message.Name); exist {
+			if protocols, exist := peer.protocols.Load(inner.msg.Name); exist {
 				for _, proto := range protocols.([]Protocol) {
-					go proto.Run(message)
+					go proto.Run(inner.pid, inner.msg)
 				}
 			}
 		case <-peer.quitCh:
@@ -213,7 +212,7 @@ func (peer *Peer) onStreamConnected(s libnet.Stream) {
 	stream.start()
 }
 
-func (peer *Peer) Broadcast(pbName string, data interface{}) {
+func (peer *Peer) Broadcast(pbName string, data []byte) {
 	for pid := range peer.routeTable.Peers() {
 		if pid == peer.ID() {
 			continue
@@ -226,7 +225,7 @@ func (peer *Peer) Broadcast(pbName string, data interface{}) {
 }
 
 // Multicast retrieves nearest peers from route table and send msg to them.
-func (peer *Peer) Multicast(pids []peer.ID, pbName string, data interface{}) {
+func (peer *Peer) Multicast(pids []peer.ID, pbName string, data []byte) {
 	for _, pid := range pids {
 		if pid == peer.ID() {
 			continue

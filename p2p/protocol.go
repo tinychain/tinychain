@@ -3,6 +3,7 @@ package p2p
 import (
 	"tinychain/p2p/pb"
 	"errors"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -15,7 +16,7 @@ type Protocol interface {
 	Type() string
 
 	// Run func handles the message from the stream
-	Run(message *pb.Message) error
+	Run(pid peer.ID, message *pb.Message) error
 
 	// Error func handles the error returned from the stream
 	Error(error)

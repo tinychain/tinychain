@@ -11,20 +11,14 @@ type DiscvActiveEvent struct{}
 
 // Message sent with p2p network layer
 type SendMsgEvent struct {
-	Target peer.ID     // Target peer id
-	Typ    string      // Message type
-	Data   interface{} // Message data
+	Target peer.ID // Target peer id
+	Typ    string  // Message type
+	Data   []byte  // Message data
 }
 
 // Multisend msg with p2p network layer
 type MultiSendEvent struct {
 	Targets []peer.ID
 	Typ     string
-	Data    interface{}
-}
-
-// Protocol manage event
-type ProtocolEvent struct {
-	Typ      string // 'add' or 'del'
-	Protocol Protocol
+	Data    []byte
 }

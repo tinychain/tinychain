@@ -8,3 +8,9 @@ message consensusMsg {
     bytes blockHash = 4;
     bytes signature = 5;
 }
+
+message peerMsg {
+    int32 type = 1;
+    bytes id = 2;
+    bytes pubKey = 3;
+}

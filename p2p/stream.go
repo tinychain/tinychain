@@ -10,6 +10,7 @@ import (
 	"errors"
 	"time"
 	"github.com/golang/protobuf/proto"
+	"tinychain/common"
 )
 
 var (
@@ -20,6 +21,12 @@ var (
 	ErrInvalidType         = errors.New("invalid data type of message")
 	ErrMsgTypeNotMatchData = errors.New("message type is not match with data")
 )
+
+// innerMsg transfer the response message to protocols through channel
+type innerMsg struct {
+	pid peer.ID    // remote peer id
+	msg *pb.Message // message received from remote peer
+}
 
 type Stream struct {
 	remoteId   peer.ID       // Remote peer id
@@ -103,24 +110,13 @@ func (s *Stream) start() {
 	go s.readLoop()
 }
 
-func (s *Stream) send(typ string, data interface{}) error {
+func (s *Stream) send(typ string, data []byte) error {
 	if s.stream == nil {
 		if err := s.connect(); err != nil {
 			return err
 		}
 	}
-	var (
-		message *pb.Message
-		err     error
-	)
-	switch data.(type) {
-	case *pb.PeerData:
-		message, err = pb.NewPeerDataMsg(typ, data.(*pb.PeerData))
-	case *pb.NormalData:
-		message, err = pb.NewNormalMsg(typ, data.(*pb.NormalData))
-	default:
-		return ErrInvalidType
-	}
+	message, err := pb.NewMessage(typ, data)
 	if err != nil {
 		return ErrMsgTypeNotMatchData
 	}
@@ -144,11 +140,11 @@ func (s *Stream) SetReadDeadline(name string) {
 		return
 	}
 	switch name {
-	case pb.ROUTESYNC_REQ:
+	case common.ROUTESYNC_REQ:
 		fallthrough
-	case pb.ROUTESYNC_RESP:
+	case common.ROUTESYNC_RESP:
 		s.stream.SetReadDeadline(time.Now().Add(routeSyncTimeout))
-	case pb.OK_MSG:
+	case common.OK_MSG:
 		s.stream.SetReadDeadline(time.Now().Add(okTimeout))
 	default:
 		s.stream.SetReadDeadline(time.Now().Add(normalTimeout))
@@ -197,7 +193,7 @@ func (s *Stream) readLoop() {
 			}
 			dataLen, err = pb.BytesToUint32(msgBuf[:pb.DATA_LENGTH_SIZE])
 			if err != nil {
-				log.Fatalf("Failed to read data length:%s\n", err)
+				log.Errorf("Failed to read data length:%s\n", err)
 				break
 			}
 		}
@@ -208,7 +204,7 @@ func (s *Stream) readLoop() {
 
 		message, err = pb.DeserializeMsg(msgBuf)
 		if err != nil {
-			log.Fatalf("Failed to deserialize message:%s\n", err)
+			log.Errorf("Failed to deserialize message:%s\n", err)
 			break
 		}
 		err = s.handleMsg(message)
@@ -248,20 +244,23 @@ func (s *Stream) handleMsg(message *pb.Message) error {
 	pbName := message.Name
 	log.Infof("Peer %s receive pb `%s`\n", s.peer.ID(), pbName)
 	switch pbName {
-	case pb.OK_MSG:
+	case common.OK_MSG:
 		// success response
 		s.Close(nil)
-	case pb.ROUTESYNC_REQ:
+	case common.ROUTESYNC_REQ:
 		// A peer wants your route table
 		return s.onSyncRoute()
-	case pb.ROUTESYNC_RESP:
+	case common.ROUTESYNC_RESP:
 		s.Close(nil)
 		// Update local route table
 		return s.syncRoute(message.Data)
 	default:
 		// Message from other modules
 		//log.Infof("Message content: %s\n", message.Data)
-		s.peer.respCh <- message
+		s.peer.respCh <- &innerMsg{
+			pid: s.stream.Conn().RemotePeer(),
+			msg: message,
+		}
 		s.Close(nil)
 	}
 	return nil
@@ -283,10 +282,13 @@ func (s *Stream) onSyncRoute() error {
 		}
 		peerInfos[i] = pinfo
 	}
-	peerData := &pb.PeerData{
+	data, err := proto.Marshal(&pb.PeerData{
 		Peers: peerInfos,
+	})
+	if err != nil {
+		return err
 	}
-	return s.send(pb.ROUTESYNC_RESP, peerData)
+	return s.send(common.ROUTESYNC_RESP, data)
 }
 
 // Receive `ROUTESYNC_RESP` and Update local route table

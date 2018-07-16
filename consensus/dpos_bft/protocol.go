@@ -5,6 +5,7 @@ import (
 	msg "tinychain/consensus/dpos_bft/message"
 	"github.com/golang/protobuf/proto"
 	"errors"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -17,7 +18,7 @@ func (eg *Engine) Type() string {
 }
 
 // Run implements the `Protocol` interface, and handle the message received from p2p layer
-func (eg *Engine) Run(message *pb.Message) error {
+func (eg *Engine) Run(pid peer.ID, message *pb.Message) error {
 	consensusMsg := msg.ConsensusMsg{}
 	err := proto.Unmarshal(message.Data, &consensusMsg)
 	if err != nil {
@@ -35,7 +36,7 @@ func (eg *Engine) Run(message *pb.Message) error {
 	}
 }
 
-// Error implements the `Protocol` interface
+// Error implements the `Protocol` interface, and handle error from p2p layer
 func (eg *Engine) Error(err error) {
 	log.Errorf("consensus receive error from p2p layer, err:%s", err)
 }
