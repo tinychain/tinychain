@@ -17,7 +17,7 @@ type BucketTree interface {
 	Init(root []byte) error
 	Prepare(dirty bmt.WriteSet) error
 	Process() (common.Hash, error)
-	Commit() error
+	Commit(batch *leveldb.Batch) error
 	Get(key []byte) ([]byte, error)
 	Copy() *bmt.BucketTree
 }
@@ -181,7 +181,7 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 	return sdb.bmt.Process()
 }
 
-func (sdb *StateDB) Commit() (common.Hash, error) {
+func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 	dirtySet := bmt.NewWriteSet()
 
 	for addr := range sdb.stateObjectsDirty {
@@ -202,7 +202,7 @@ func (sdb *StateDB) Commit() (common.Hash, error) {
 	if err := sdb.bmt.Prepare(dirtySet); err != nil {
 		return common.Hash{}, err
 	}
-	if err := sdb.bmt.Commit(); err != nil {
+	if err := sdb.bmt.Commit(batch); err != nil {
 		return common.Hash{}, err
 	}
 	return sdb.bmt.Hash(), nil

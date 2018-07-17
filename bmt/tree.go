@@ -190,7 +190,10 @@ func (bt *BucketTree) processNodes() error {
 	return nil
 }
 
-func (bt *BucketTree) Commit() error {
+// commit commits all data in memory to db.Batch.
+// At this time, data is not really stored in db, so you should
+// explicitly invoke batch.Write().
+func (bt *BucketTree) Commit(batch *leveldb.Batch) error {
 	if bt.db == nil {
 		return ErrDbNotOpen
 	}
@@ -203,7 +206,7 @@ func (bt *BucketTree) Commit() error {
 		return err
 	}
 	// Compute bucket hash and put new buckets to db
-	err = bt.hashTable.store()
+	err = bt.hashTable.commit(batch)
 	if err != nil {
 		return err
 	}
@@ -211,11 +214,11 @@ func (bt *BucketTree) Commit() error {
 	if err != nil {
 		return err
 	}
-	err = bt.db.PutHashTable(root.Hash(), bt.hashTable)
+	err = bt.db.PutHashTable(batch, root.Hash(), bt.hashTable)
 	if err != nil {
 		return err
 	}
-	err = bt.commitNode(root)
+	err = bt.commitNode(batch, root)
 	if err != nil {
 		return err
 	}
@@ -224,14 +227,14 @@ func (bt *BucketTree) Commit() error {
 }
 
 // Commit node store
-func (bt *BucketTree) commitNode(node *MerkleNode) error {
+func (bt *BucketTree) commitNode(batch *leveldb.Batch, node *MerkleNode) error {
 	if node == nil {
 		return nil
 	}
-	node.store()
+	node.commit(batch)
 	for i, child := range node.childNodes {
 		if node.dirty[i] {
-			err := bt.commitNode(child)
+			err := bt.commitNode(batch, child)
 			if err != nil {
 				return err
 			}
@@ -279,5 +282,9 @@ func Commit(set WriteSet, db *leveldb.LDBDatabase) error {
 	tree := NewBucketTree(db)
 	tree.Init(nil)
 	tree.Prepare(set)
-	return tree.Commit()
+	batch := db.NewBatch()
+	if err := tree.Commit(batch); err != nil {
+		return err
+	}
+	return batch.Write()
 }

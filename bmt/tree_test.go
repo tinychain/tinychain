@@ -36,6 +36,7 @@ func TestBucketTree_WithoutDB(t *testing.T) {
 }
 
 func TestBucketTree_Process(t *testing.T) {
+	var batch = db.NewBatch()
 	writeSet := NewWriteSet()
 	writeSet["test1"] = []byte("asdffsdf")
 	writeSet["abcd"] = []byte("test2asd")
@@ -47,7 +48,9 @@ func TestBucketTree_Process(t *testing.T) {
 	assert.Nil(t, err)
 	err = btree.Prepare(writeSet)
 	assert.Nil(t, err)
-	err = btree.Commit()
+	err = btree.Commit(batch)
+	assert.Nil(t, err)
+	err = batch.Write()
 	assert.Nil(t, err)
 }
 
@@ -62,12 +65,15 @@ func TestBucketTree_Read(t *testing.T) {
 }
 
 func TestBucketTree_Update(t *testing.T) {
+	var batch = db.NewBatch()
 	oldRoot := btree.Hash()
 	newSet := NewWriteSet()
 	newSet["lowesyang"] = []byte("lowesyang")
 	err := btree.Prepare(newSet)
 	assert.Nil(t, err)
-	err = btree.Commit()
+	err = btree.Commit(batch)
+	assert.Nil(t, err)
+	err = batch.Write()
 	assert.Nil(t, err)
 	assert.NotEqual(t, oldRoot, btree.Hash())
 }

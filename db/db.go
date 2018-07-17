@@ -54,10 +54,7 @@ func (tdb *TinyDB) GetLastBlock() (common.Hash, error) {
 }
 
 func (tdb *TinyDB) PutLastBlock(hash common.Hash) error {
-	err := tdb.db.Put([]byte(KeyLastBlock), hash.Bytes())
-	if err != nil {
-		return err
-	}
+	return tdb.db.Put([]byte(KeyLastBlock), hash.Bytes())
 	return nil
 }
 
@@ -141,10 +138,14 @@ func (tdb *TinyDB) GetHeight(hash common.Hash) (uint64, error) {
 	return common.Bytes2Uint(data), nil
 }
 
-func (tdb *TinyDB) PutHeight(hash common.Hash, height uint64) error {
-	err := tdb.db.Put([]byte("H"+hash.String()), common.Uint2Bytes(height))
-	if err != nil {
-		return err
+func (tdb *TinyDB) PutHeight(batch *leveldb.Batch, hash common.Hash, height uint64, sync, flush bool) error {
+	batch.Put([]byte("H"+hash.String()), common.Uint2Bytes(height))
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
 	}
 	return nil
 }
@@ -159,13 +160,17 @@ func (tdb *TinyDB) GetBlock(height uint64, hash common.Hash) (*types.Block, erro
 	return &block, nil
 }
 
-func (tdb *TinyDB) PutBlock(block *types.Block) error {
+func (tdb *TinyDB) PutBlock(batch *leveldb.Batch, block *types.Block, sync, flush bool) error {
 	height := block.Height()
 	hash := block.Hash()
 	data, _ := block.Serialize()
-	err := tdb.db.Put([]byte("b"+strconv.FormatUint(height, 10)+hash.String()), data)
-	if err != nil {
-		return err
+	batch.Put([]byte("b"+strconv.FormatUint(height, 10)+hash.String()), data)
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
 	}
 	return nil
 }
@@ -183,12 +188,20 @@ func (tdb *TinyDB) GerReceipts(height uint64, hash common.Hash) (types.Receipts,
 	return receipts, nil
 }
 
-func (tdb *TinyDB) PutReceipts(height uint64, hash common.Hash, receipts types.Receipts) error {
+func (tdb *TinyDB) PutReceipts(batch *leveldb.Batch, height uint64, hash common.Hash, receipts types.Receipts, sync, flush bool) error {
 	data, err := receipts.Serialize()
 	if err != nil {
 		return err
 	}
-	return tdb.db.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data)
+	batch.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data)
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
+	}
+	return nil
 }
 
 func (tdb *TinyDB) GetTxMeta(txHash common.Hash) (*types.TxMeta, error) {
@@ -203,8 +216,7 @@ func (tdb *TinyDB) GetTxMeta(txHash common.Hash) (*types.TxMeta, error) {
 }
 
 // PutTxMetas put transactions' meta to db in batch
-func (tdb *TinyDB) PutTxMetas(txs types.Transactions, hash common.Hash, height uint64) error {
-	batch := tdb.db.NewBatch()
+func (tdb *TinyDB) PutTxMetas(batch *leveldb.Batch, txs types.Transactions, hash common.Hash, height uint64, sync, flush bool) error {
 	for i, tx := range txs {
 		txMeta := &types.TxMeta{
 			Hash:    hash,
@@ -216,5 +228,12 @@ func (tdb *TinyDB) PutTxMetas(txs types.Transactions, hash common.Hash, height u
 			return err
 		}
 	}
-	return batch.Write()
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
+	}
+	return nil
 }

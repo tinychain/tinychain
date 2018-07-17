@@ -105,34 +105,34 @@ func (self *LDBDatabase) LDB() *leveldb.DB {
 
 // NewBatch returns a Batch instance
 // it allows batch-operation
-func (db *LDBDatabase) NewBatch() *ldbBatch {
-	return &ldbBatch{db: db.db, b: new(leveldb.Batch)}
+func (db *LDBDatabase) NewBatch() *Batch {
+	return &Batch{db: db.db, b: new(leveldb.Batch)}
 }
 
 // The Batch for LevelDB
 // ldbBatch implements the Batch interface
-type ldbBatch struct {
+type Batch struct {
 	db *leveldb.DB
 	b  *leveldb.Batch
 }
 
 // Put put the key-value to ldbBatch
-func (b *ldbBatch) Put(key, value []byte) error {
+func (b *Batch) Put(key, value []byte) error {
 	b.b.Put(key, value)
 	return nil
 }
 
 // Delete delete the key-value to ldbBatch
-func (b *ldbBatch) Delete(key []byte) error {
+func (b *Batch) Delete(key []byte) error {
 	b.b.Delete(key)
 	return nil
 }
 
 // Write write batch-operation to database
-func (b *ldbBatch) Write() error {
+func (b *Batch) Write() error {
 	return b.db.Write(b.b, nil)
 }
 
-func (b *ldbBatch) Len() int {
+func (b *Batch) Len() int {
 	return b.b.Len()
 }

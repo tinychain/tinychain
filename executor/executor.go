@@ -11,6 +11,7 @@ import (
 	"tinychain/consensus"
 	bp "tinychain/executor/blockpool"
 	"sync/atomic"
+	"tinychain/db"
 )
 
 var (
@@ -34,13 +35,8 @@ type Blockchain interface {
 	AddBlock(block *types.Block) error
 }
 
-type Database interface {
-	PutTxMetas(transactions types.Transactions, hash common.Hash, height uint64) error
-	PutReceipts(height uint64, hash common.Hash, receipts types.Receipts) error
-}
-
 type Executor struct {
-	db        Database
+	db        *db.TinyDB
 	processor Processor
 	chain     Blockchain     // Blockchain wrapper
 	validator BlockValidator // Block validator
@@ -58,7 +54,7 @@ type Executor struct {
 	commitSub       event.Subscription // Subscribe state commit event
 }
 
-func New(config *common.Config, db Database, chain *core.Blockchain, statedb *state.StateDB, engine consensus.Engine) *Executor {
+func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *state.StateDB, engine consensus.Engine) *Executor {
 	processor := core.NewStateProcessor(chain, statedb, engine)
 	executor := &Executor{
 		db:        db,
@@ -146,6 +142,7 @@ func (ex *Executor) process() error {
 
 // processBlock process the validation and execution of a received block from other peers
 func (ex *Executor) processBlock(block *types.Block) error {
+
 	if block.Height() < ex.chain.LastBlock().Height() {
 		return ErrBlockFallbehind
 	}

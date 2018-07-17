@@ -32,16 +32,12 @@ func (bdb *BmtDB) GetNode(key common.Hash) (*MerkleNode, error) {
 	return node, nil
 }
 
-func (bdb *BmtDB) PutNode(key common.Hash, node *MerkleNode) error {
+func (bdb *BmtDB) PutNode(batch *leveldb.Batch, key common.Hash, node *MerkleNode) error {
 	data, err := node.serialize()
 	if err != nil {
 		return err
 	}
-	err = bdb.db.Put([]byte(NodeKeyPrefix+key.String()), data)
-	if err != nil {
-		log.Errorf("Failed to put node to BmtDB: %s", err)
-		return err
-	}
+	batch.Put([]byte(NodeKeyPrefix+key.String()), data)
 	return nil
 }
 
@@ -58,16 +54,12 @@ func (bdb *BmtDB) GetBucket(key common.Hash) (*Bucket, error) {
 	return bucket, nil
 }
 
-func (bdb *BmtDB) PutBucket(key common.Hash, bucket *Bucket) error {
+func (bdb *BmtDB) PutBucket(batch *leveldb.Batch, key common.Hash, bucket *Bucket) error {
 	data, err := bucket.serialize()
 	if err != nil {
 		return nil
 	}
-	err = bdb.db.Put([]byte(BucketKeyPrefix+key.String()), data)
-	if err != nil {
-		log.Errorf("Failed to put bucket to BmtDB: %s", err)
-		return err
-	}
+	batch.Put([]byte(BucketKeyPrefix+key.String()), data)
 	return nil
 }
 
@@ -84,10 +76,11 @@ func (bdb *BmtDB) GetHashTable(key common.Hash) (*HashTable, error) {
 	return ht, nil
 }
 
-func (bdb *BmtDB) PutHashTable(key common.Hash, ht *HashTable) error {
+func (bdb *BmtDB) PutHashTable(batch *leveldb.Batch, key common.Hash, ht *HashTable) error {
 	data, err := ht.serialize()
 	if err != nil {
 		return err
 	}
-	return bdb.db.Put([]byte(HashTableKeyPrefix+key.String()), data)
+	batch.Put([]byte(HashTableKeyPrefix+key.String()), data)
+	return nil
 }

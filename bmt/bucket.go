@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"errors"
 	"sort"
+	"tinychain/db/leveldb"
 )
 
 type Bucket struct {
@@ -168,7 +169,7 @@ func (ht *HashTable) get(key string) ([]byte, error) {
 	return bucket.Slots[key], nil
 }
 
-func (ht *HashTable) store() error {
+func (ht *HashTable) commit(batch *leveldb.Batch) error {
 	if ht.db == nil {
 		return ErrDbNotOpen
 	}
@@ -177,7 +178,7 @@ func (ht *HashTable) store() error {
 	for i, dirty := range ht.dirty {
 		if dirty {
 			bucket := ht.buckets[i]
-			err := ht.db.PutBucket(bucket.Hash(), bucket)
+			err := ht.db.PutBucket(batch,bucket.Hash(), bucket)
 			if err != nil {
 				return err
 			}
