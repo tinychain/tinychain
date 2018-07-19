@@ -6,7 +6,7 @@ import (
 	"tinychain/common"
 	"tinychain/core/state"
 	"tinychain/core"
-	bpool "tinychain/common/blockpool"
+	bpool "tinychain/core/blockpool"
 	"github.com/libp2p/go-libp2p-peer"
 )
 

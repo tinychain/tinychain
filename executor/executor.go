@@ -9,7 +9,7 @@ import (
 	"tinychain/common"
 	"errors"
 	"tinychain/consensus"
-	bpool "tinychain/common/blockpool"
+	bpool "tinychain/core/blockpool"
 	"sync/atomic"
 	"tinychain/db"
 	"sync"
