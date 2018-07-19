@@ -11,10 +11,8 @@ import (
 	"sync/atomic"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-peer"
-)
-
-var (
-	log = common.GetLogger("consensus")
+	"tinychain/p2p"
+	"github.com/op/go-logging"
 )
 
 const (
@@ -24,16 +22,30 @@ const (
 	COMMIT
 )
 
+type BlockPool interface {
+	p2p.Protocol
+	GetBlock(height uint64) *types.Block
+	Clear(height uint64)
+}
+
 type Blockchain interface {
 	LastBlock() *types.Block
 }
 
+// Engine is the main wrapper of dpos_bft algorithm
+// The dpos_bft algorithm process procedures described below:
+// 1. select the 21 block producer at a round, and shuffle the order of them.
+// 2. every selected block producers propose a new block in turn, and multicast to other BPs.
+// 3. Wait 0.5s for network io, and this BP kick off the bft process.
+// 4. After bft performs successfully, all BPs commit the blocks.
 type Engine struct {
 	config   *Config
-	chain    Blockchain // current blockchain
-	peers    *peerPool
-	bp       *blockProducer
-	bftState atomic.Value
+	log      *logging.Logger
+	chain    Blockchain     // current blockchain
+	bps      *bpsPool       // manage and operate block producers' info
+	bpool    BlockPool      // pool to retrieves new proposed blocks
+	self     *blockProducer // self bp info
+	bftState atomic.Value   // the state of current bft period
 	event    *event.TypeMux
 	quitCh   chan struct{}
 
@@ -41,25 +53,25 @@ type Engine struct {
 	consensusSub event.Subscription // Subscribe kick_off bft event
 }
 
-func NewEngine(config *common.Config, chain Blockchain, id peer.ID) (*Engine, error) {
+func New(config *common.Config, log *logging.Logger, chain Blockchain, id peer.ID, bpool BlockPool) (*Engine, error) {
 	conf := newConfig(config)
 	privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
 	if err != nil {
 		return nil, err
 	}
 	// init block producer info
-	bp, err := newBP(conf, id, privKey)
-	if err != nil {
-		log.Errorf("failed to initialize the info of block producer")
-		return nil, err
+	self := &blockProducer{
+		id:      id,
+		privKey: privKey,
 	}
 	return &Engine{
 		config: conf,
 		chain:  chain,
 		event:  event.GetEventhub(),
-		bp:     bp,
+		self:   self,
+		bpool:  bpool,
 		quitCh: make(chan struct{}),
-		peers:  newPeerPool(bp),
+		bps:    newBPsPool(log, self),
 	}, nil
 }
 
@@ -89,7 +101,7 @@ func (eg *Engine) listen() {
 }
 
 func (eg *Engine) Address() common.Address {
-	return eg.bp.address
+	return eg.self.Addr()
 }
 
 func (eg *Engine) getState() int {
@@ -128,4 +140,12 @@ func (eg *Engine) Finalize(header *types.Header, state *state.StateDB, txs types
 
 	header.TxRoot = txs.Hash()
 	return types.NewBlock(header, txs), nil
+}
+
+func (eg *Engine) Protocols() []p2p.Protocol {
+	return []p2p.Protocol{
+		eg,
+		eg.bps,
+		eg.bpool,
+	}
 }

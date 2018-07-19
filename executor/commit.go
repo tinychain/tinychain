@@ -12,6 +12,15 @@ func (ex *Executor) commit(block *types.Block) error {
 		return err
 	}
 
+	if receipts, exist := ex.receiptsCache.Load(block.Height()); exist {
+		err := ex.persistReceipts(block, receipts.(types.Receipts))
+		if err != nil {
+			log.Errorf("failed to persist receipts, err:%s", err)
+			return err
+		}
+		ex.receiptsCache.Delete(block.Height())
+	}
+
 	if err := ex.commitBlock(block); err != nil {
 		return err
 	}
@@ -44,5 +53,5 @@ func (ex *Executor) persistReceipts(block *types.Block, receipts types.Receipts)
 }
 
 func (ex *Executor) commitBlock(block *types.Block) error {
-	return ex.chain.AddBlock(block)
+	return ex.chain.CommitBlock(block)
 }

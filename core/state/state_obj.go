@@ -9,7 +9,7 @@ import (
 )
 
 // Value is not actually hash, but just a 32 bytes array
-type Storage map[common.Hash]common.Hash
+type Storage map[common.Hash][]byte
 
 type stateObject struct {
 	address common.Address
@@ -103,22 +103,21 @@ func (s *stateObject) Bmt(db *leveldb.LDBDatabase) BucketTree {
 	return tree
 }
 
-func (s *stateObject) GetState(key common.Hash) common.Hash {
+func (s *stateObject) GetState(key common.Hash) []byte {
 	if val, exist := s.cacheStorage[key]; exist {
 		return val
 	}
 	// Load slot from bucket merkel tree
 	val, err := s.bmt.Get(key.Bytes())
 	if err != nil {
-		return common.Hash{}
+		return nil
 	}
-	slot := common.BytesToHash(val)
-	s.SetState(key, slot)
-	return slot
+	s.SetState(key, val)
+	return val
 
 }
 
-func (s *stateObject) SetState(key, value common.Hash) {
+func (s *stateObject) SetState(key common.Hash, value []byte) {
 	s.cacheStorage[key] = value
 	s.dirtyStorage[key] = value
 }
@@ -127,7 +126,7 @@ func (s *stateObject) updateRoot() (common.Hash, error) {
 	dirtySet := bmt.NewWriteSet()
 	for key, value := range s.dirtyStorage {
 		delete(s.dirtyStorage, key)
-		dirtySet[key.String()] = value.Bytes()
+		dirtySet[key.String()] = value
 		// TODO if value.Nil() ?
 	}
 
@@ -138,8 +137,8 @@ func (s *stateObject) updateRoot() (common.Hash, error) {
 	return s.bmt.Process()
 }
 
-func (s *stateObject) Commit() error {
-	err := s.bmt.Commit()
+func (s *stateObject) Commit(batch *leveldb.Batch) error {
+	err := s.bmt.Commit(batch)
 	if err != nil {
 		return err
 	}

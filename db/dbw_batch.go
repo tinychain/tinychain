@@ -9,6 +9,7 @@ var (
 	batchMgr *BatchMgr
 )
 
+// BatchMgr manages db write batch
 type BatchMgr struct {
 	batches sync.Map
 }

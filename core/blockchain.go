@@ -105,6 +105,7 @@ func (bc *Blockchain) clear() {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
+	bc.lastBlock.Store(nil)
 	bc.blocksCache.Purge()
 	bc.headerCache.Purge()
 }
@@ -196,15 +197,15 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 			"block #%d cannot be added into blockchain because its previous block height is #%d",
 			block.Height(), last.Height()))
 	}
-	return bc.commit(block)
+	bc.blocksCache.Add(block.Height(), block)
+	bc.lastBlock.Store(block)
+	return nil
 }
 
 // commit persist the block to db.
-func (bc *Blockchain) commit(block *types.Block) error {
+func (bc *Blockchain) CommitBlock(block *types.Block) error {
 	// Put block to db.Batch
 	bc.db.PutBlock(db.GetBatch(bc.db.LDB(), block.Height()), block, false, false)
-	bc.blocksCache.Add(block.Height(), block)
-	bc.lastBlock.Store(block)
 	if err := bc.db.PutLastBlock(block.Hash()); err != nil {
 		log.Errorf("failed to put last block hash to db, err:%s", err)
 		return err

@@ -7,11 +7,13 @@ import (
 	"tinychain/core"
 	"errors"
 	"tinychain/common"
+	"tinychain/p2p/pb"
+	"github.com/libp2p/go-libp2p-peer"
+	"github.com/op/go-logging"
+	"encoding/json"
 )
 
 var (
-	log = common.GetLogger("blockpool")
-
 	ErrBlockDuplicate = errors.New("block duplicate")
 	ErrPoolFull       = errors.New("block pool is full")
 )
@@ -19,6 +21,8 @@ var (
 type BlockPool struct {
 	maxBlockSize uint64
 	mu           sync.RWMutex
+	log          *logging.Logger
+	msgType      string                  // Message type for p2p transfering
 	valid        map[uint64]*types.Block // Valid blocks pool. map[height]*block
 	event        *event.TypeMux
 	quitCh       chan struct{}
@@ -26,11 +30,13 @@ type BlockPool struct {
 	blockSub event.Subscription // Subscribe new block received from p2p
 }
 
-func NewBlockPool(config *common.Config) *BlockPool {
+func NewBlockPool(config *common.Config, log *logging.Logger, msgType string) *BlockPool {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
 	bp := &BlockPool{
 		maxBlockSize: maxBlockSize,
 		event:        event.GetEventhub(),
+		log:          log,
+		msgType:      msgType,
 		valid:        make(map[uint64]*types.Block, maxBlockSize),
 		quitCh:       make(chan struct{}),
 	}
@@ -38,24 +44,24 @@ func NewBlockPool(config *common.Config) *BlockPool {
 	return bp
 }
 
-func (bp *BlockPool) Start() {
-	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
-
-	go bp.listen()
-}
-
-func (bp *BlockPool) listen() {
-	for {
-		select {
-		case ev := <-bp.blockSub.Chan():
-			block := ev.(*core.NewBlockEvent).Block
-			go bp.add(block)
-		case <-bp.quitCh:
-			bp.blockSub.Unsubscribe()
-			return
-		}
-	}
-}
+//func (bp *BlockPool) Start() {
+//	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
+//
+//	go bp.listen()
+//}
+//
+//func (bp *BlockPool) listen() {
+//	for {
+//		select {
+//		case ev := <-bp.blockSub.Chan():
+//			block := ev.(*core.NewBlockEvent).Block
+//			go bp.add(block)
+//		case <-bp.quitCh:
+//			bp.blockSub.Unsubscribe()
+//			return
+//		}
+//	}
+//}
 
 func (bp *BlockPool) Valid() []*types.Block {
 	var blocks []*types.Block
@@ -112,11 +118,30 @@ func (bp *BlockPool) Clear(height uint64) {
 }
 
 // Size gets the size of valid blocks.
-// The caller should hold the lock before invoke this func.
 func (bp *BlockPool) Size() uint64 {
+	bp.mu.RLock()
+	defer bp.mu.RUnlock()
 	return uint64(len(bp.valid))
 }
 
-func (bp *BlockPool) Stop() {
-	close(bp.quitCh)
+//func (bp *BlockPool) Stop() {
+//	close(bp.quitCh)
+//}
+
+func (bp *BlockPool) Type() string {
+	return bp.msgType
+}
+
+func (bp *BlockPool) Run(pid peer.ID, message *pb.Message) error {
+	block := types.Block{}
+	err := json.Unmarshal(message.Data, &block)
+	if err != nil {
+		return err
+	}
+	bp.add(&block)
+	return nil
+}
+
+func (bp *BlockPool) Error(err error) {
+	bp.log.Errorf("blockpool error: %s", err)
 }

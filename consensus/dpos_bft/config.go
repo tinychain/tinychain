@@ -3,8 +3,9 @@ package dpos_bft
 import "tinychain/common"
 
 type Config struct {
-	GasLimit uint64 // Block gas limit
-	PrivKey  []byte // Private key of block producer
+	RoundSize int    // max number of block producers for one round
+	GasLimit  uint64 // Block gas limit
+	PrivKey   []byte // Private key of block producer
 }
 
 func newConfig(config *common.Config) *Config {

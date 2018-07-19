@@ -6,6 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"errors"
 	"github.com/libp2p/go-libp2p-peer"
+	"tinychain/common"
 )
 
 var (
@@ -14,7 +15,7 @@ var (
 
 // Type implements the `Protocol` interface, and returns the message type of consensus engine
 func (eg *Engine) Type() string {
-	return "CONSENSUS_MSG"
+	return common.CONSENSUS_MSG
 }
 
 // Run implements the `Protocol` interface, and handle the message received from p2p layer
@@ -31,14 +32,14 @@ func (eg *Engine) Run(pid peer.ID, message *pb.Message) error {
 	case COMMIT:
 		return eg.commit(&consensusMsg)
 	default:
-		log.Errorf("error: %s", errUnknownType)
+		eg.log.Errorf("error: %s", errUnknownType)
 		return errUnknownType
 	}
 }
 
 // Error implements the `Protocol` interface, and handle error from p2p layer
 func (eg *Engine) Error(err error) {
-	log.Errorf("consensus receive error from p2p layer, err:%s", err)
+	eg.log.Errorf("consensus receive error from p2p layer, err:%s", err)
 }
 
 // startBFT kicks off the bft process

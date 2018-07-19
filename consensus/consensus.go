@@ -5,6 +5,9 @@ import (
 	"tinychain/core/types"
 	"tinychain/common"
 	"tinychain/core/state"
+	"tinychain/core"
+	bpool "tinychain/common/blockpool"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 type Engine interface {
@@ -21,6 +24,7 @@ type TxPool interface {
 	Pending() map[common.Address]types.Transactions
 }
 
-func New() Engine {
-	return dpos_bft.NewDpos()
+func New(config *common.Config, chain *core.Blockchain, id peer.ID) (Engine, error) {
+	log := common.GetLogger("consensus")
+	return dpos_bft.New(config, log, chain, id, bpool.NewBlockPool(config, log, common.PROPOSE_BLOCK_MSG))
 }

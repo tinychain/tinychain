@@ -9,9 +9,10 @@ import (
 	"tinychain/common"
 	"errors"
 	"tinychain/consensus"
-	bp "tinychain/executor/blockpool"
+	bpool "tinychain/common/blockpool"
 	"sync/atomic"
 	"tinychain/db"
+	"sync"
 )
 
 var (
@@ -33,6 +34,7 @@ type Processor interface {
 type Blockchain interface {
 	LastBlock() *types.Block
 	AddBlock(block *types.Block) error
+	CommitBlock(block *types.Block) error
 }
 
 type Executor struct {
@@ -42,10 +44,12 @@ type Executor struct {
 	validator BlockValidator // Block validator
 	batch     batcher.Batch  // Batch for creating new block
 	blockpool BlockPool      // Block pool for new block caching
-	state     *state.StateDB // State db of l
+	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
 	quitCh    chan struct{}
+
+	receiptsCache sync.Map // receipts cache, map[uint64]types.Receipts
 
 	processing atomic.Value // Processing state, 1 means processing, 0 means idle
 
@@ -64,7 +68,7 @@ func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *
 		engine:    engine,
 		event:     event.GetEventhub(),
 		quitCh:    make(chan struct{}),
-		blockpool: bp.NewBlockPool(config),
+		blockpool: bpool.NewBlockPool(config, log, common.READY_BLOCK_MSG),
 	}
 	return executor
 }
@@ -162,14 +166,11 @@ func (ex *Executor) processBlock(block *types.Block) error {
 		return err
 	}
 
-	if err := ex.persistReceipts(block, receipts); err != nil {
-		log.Errorf("failed to persist receipts, err:%s", err)
-		return err
-	}
+	// Save receipts to cache
+	ex.receiptsCache.Store(block.Height(), receipts)
 
-	if err := ex.commit(block); err != nil {
-		// TODO: roll back
-		log.Errorf("failed to commit block, err:%s", err)
+	if err := ex.chain.AddBlock(block); err != nil {
+		log.Errorf("failed to add block to blockchain cache, err:%s", err)
 		return err
 	}
 
@@ -185,13 +186,11 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 		return err
 	}
 
+	// Save receipts to cache
+	ex.receiptsCache.Store(block.Height(), receipts)
+
 	if _, err := ex.engine.Finalize(block.Header, ex.state, block.Transactions, receipts); err != nil {
 		log.Errorf("failed to finalize the block #%d, err:%s", block.Height(), err)
-		return err
-	}
-
-	if err := ex.persistReceipts(block, receipts); err != nil {
-		log.Errorf("failed to persist receipts, err:%s", err)
 		return err
 	}
 

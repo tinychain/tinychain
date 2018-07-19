@@ -85,16 +85,16 @@ func (sdb *StateDB) setStateObj(object *stateObject) {
 }
 
 // Get state of an account with address
-func (sdb *StateDB) GetState(addr common.Address, key common.Hash) common.Hash {
+func (sdb *StateDB) GetState(addr common.Address, key common.Hash) []byte {
 	stateObj := sdb.GetStateObj(addr)
 	if stateObj != nil {
 		return stateObj.GetState(key)
 	}
-	return common.Hash{}
+	return nil
 }
 
 // Set state of an account
-func (sdb *StateDB) SetState(addr common.Address, key, value common.Hash) {
+func (sdb *StateDB) SetState(addr common.Address, key common.Hash, value []byte) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
 		stateObj.SetState(key, value)
@@ -196,6 +196,9 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 			if err := sdb.db.PutCode(stateobj.CodeHash(), stateobj.Code()); err != nil {
 				stateobj.dirtyCode = false
 			}
+		}
+		if err := stateobj.Commit(batch); err != nil {
+			return common.Hash{}, err
 		}
 	}
 
