@@ -20,6 +20,8 @@ const (
 	PROPOSE    = iota
 	PRE_COMMIT
 	COMMIT
+
+	BLOCK_PROPOSE_GAP = 5 * time.Second
 )
 
 type BlockPool interface {
@@ -39,15 +41,20 @@ type Blockchain interface {
 // 3. Wait 0.5s for network io, and this BP kick off the bft process.
 // 4. After bft performs successfully, all BPs commit the blocks.
 type Engine struct {
-	config   *Config
-	log      *logging.Logger
-	chain    Blockchain     // current blockchain
-	bps      *bpsPool       // manage and operate block producers' info
-	bpool    BlockPool      // pool to retrieves new proposed blocks
-	self     *blockProducer // self bp info
-	bftState atomic.Value   // the state of current bft period
-	event    *event.TypeMux
-	quitCh   chan struct{}
+	config *Config
+	log    *logging.Logger
+
+	seqNo    atomic.Value // current block height at bft processing
+	chain    Blockchain   // current blockchain
+	bps      *bpsMgr      // manage and operate block producers' info
+	bpool    BlockPool    // pool to retrieves new proposed blocks
+	bftState atomic.Value // the state of current bft period
+
+	preCommitVotes int // pre-commit votes statistics
+	commitVotes    int // commit votes statistics
+
+	event  *event.TypeMux
+	quitCh chan struct{}
 
 	newTxsSub    event.Subscription // Subscribe new txs event from tx_pool
 	consensusSub event.Subscription // Subscribe kick_off bft event
@@ -67,11 +74,10 @@ func New(config *common.Config, log *logging.Logger, chain Blockchain, id peer.I
 	return &Engine{
 		config: conf,
 		chain:  chain,
+		bps:    newBPsMgr(conf, log, self, chain),
 		event:  event.GetEventhub(),
-		self:   self,
 		bpool:  bpool,
 		quitCh: make(chan struct{}),
-		bps:    newBPsPool(log, self),
 	}, nil
 }
 
@@ -100,8 +106,26 @@ func (eg *Engine) listen() {
 	}
 }
 
+// proposeLoop set a loop to try to propose a block every 2s
+func (eg *Engine) proposeLoop() {
+	ticker := time.NewTicker(BLOCK_PROPOSE_GAP)
+	for {
+		select {
+		case <-ticker.C:
+			self := eg.bps.reachSelfTurn()
+			if self == nil {
+				continue
+			}
+			// TODO try to check the current state of bps and decide to propose block or not
+			// 1. if the rate of vote is lower than 15%, select bp randomly
+			// 2. if the rate of votes is higher than 15%, select the highest 21 bps to produce blocks in turn
+
+		}
+	}
+}
+
 func (eg *Engine) Address() common.Address {
-	return eg.self.Addr()
+	return eg.bps.self.Addr()
 }
 
 func (eg *Engine) getState() int {

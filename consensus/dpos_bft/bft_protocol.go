@@ -43,16 +43,32 @@ func (eg *Engine) Error(err error) {
 }
 
 // startBFT kicks off the bft process
+// 1. propse next blocks
+// 2. if valid, multicast PRE_COMMIT
 func (eg *Engine) startBFT() {
 
 }
 
+// preCommit receives pre_commit message and decide whether to process the block
+// and multicast COMMIT
+// 1. process block
+// 2. if valid, multicast COMMIT
 func (eg *Engine) preCommit(message *msg.ConsensusMsg) error {
-	if eg.chain.LastBlock().Height() != message.SeqNo+1 {
-
+	eg.preCommitVotes += 1
+	if eg.preCommitVotes <= eg.config.RoundSize*2/3 {
+		return nil
 	}
+
+
+
 }
 
-func (dpos *Engine) commit(message *msg.ConsensusMsg) error {
+// commit receives commit message and decide whether to commit the block
+func (eg *Engine) commit(message *msg.ConsensusMsg) error {
+	eg.commitVotes += 1
+	if eg.commitVotes <= eg.config.RoundSize*2/3 {
+		return nil
+	}
+
 
 }

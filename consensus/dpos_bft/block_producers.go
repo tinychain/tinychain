@@ -6,20 +6,19 @@ import (
 	"github.com/libp2p/go-libp2p-peer"
 	"sort"
 	"sync"
+	"math/rand"
 )
 
 type ProducersInfo struct {
 	mu        sync.RWMutex
 	all       map[peer.ID]*blockProducer
-	bps       Producers // active block producers at current round
-	currBP    int       // index of current block producer
-	roundSize int       // max number of valid BP in one round
+	roundSize int // max number of valid BP in one round
 }
 
-func newProducersInfo(maxSize int) *ProducersInfo {
+func newProducersInfo(roundSize int) *ProducersInfo {
 	return &ProducersInfo{
-		bps:       make([]*blockProducer, maxSize),
-		roundSize: maxSize,
+		all:       make(map[peer.ID]*blockProducer),
+		roundSize: roundSize,
 	}
 }
 
@@ -31,13 +30,27 @@ func (pi *ProducersInfo) get(id peer.ID) *blockProducer {
 
 func (pi *ProducersInfo) getAll() Producers {
 	pi.mu.RLock()
-	defer pi.mu.RUnlock()
 	var bps Producers
 	for _, bp := range pi.all {
 		bps = append(bps, bp)
 	}
+	pi.mu.RUnlock()
 	sort.Sort(bps)
 	return bps
+}
+
+// getDposBPs get the given number of bps at the current round according to DPOS mechanism
+func (pi *ProducersInfo) getDposBPs() Producers {
+	return pi.getAll()[:pi.roundSize]
+}
+
+// getRandomBPs get the random list of bps. The random seed is according to the prev_block_hash
+func (pi *ProducersInfo) getRandomBPs(prevHash common.Hash) Producers {
+	bps := pi.getAll()
+	rand.Shuffle(len(bps), func(i, j int) {
+		bps[i], bps[j] = bps[j], bps[i]
+	})
+	return bps[:pi.roundSize]
 }
 
 func (pi *ProducersInfo) next() {
@@ -51,13 +64,15 @@ func (pi *ProducersInfo) add(bp *blockProducer) {
 }
 
 func (pi *ProducersInfo) remove(id peer.ID) {
-
+	pi.mu.Lock()
+	defer pi.mu.Unlock()
+	delete(pi.all, id)
 }
 
 func (pi *ProducersInfo) len() int {
 	pi.mu.RLock()
 	defer pi.mu.RUnlock()
-	return len(pi.bps)
+	return len(pi.all)
 }
 
 type blockProducer struct {

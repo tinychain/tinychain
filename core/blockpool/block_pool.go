@@ -63,6 +63,11 @@ func NewBlockPool(config *common.Config, log *logging.Logger, msgType string) *B
 //	}
 //}
 
+// MsgType returns the msg type used in p2p layer
+func (bp *BlockPool) MsgType() string {
+	return bp.msgType
+}
+
 func (bp *BlockPool) Valid() []*types.Block {
 	var blocks []*types.Block
 	bp.mu.RLock()

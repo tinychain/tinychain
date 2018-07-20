@@ -65,7 +65,7 @@ func (bc *Blockchain) loadLastState() error {
 	}
 
 	bc.lastBlock.Store(lastBlock)
-	bc.blocksCache.Add(lastBlock.Hash(), lastBlock)
+	bc.blocksCache.Add(lastBlock.Height(), lastBlock)
 	// TODO
 
 	return nil
