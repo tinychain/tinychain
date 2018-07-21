@@ -9,7 +9,6 @@ import (
 	"tinychain/common"
 	"errors"
 	"tinychain/consensus"
-	bpool "tinychain/core/blockpool"
 	"sync/atomic"
 	"tinychain/db"
 	"sync"
@@ -43,7 +42,6 @@ type Executor struct {
 	chain     Blockchain     // Blockchain wrapper
 	validator BlockValidator // Block validator
 	batch     batcher.Batch  // Batch for creating new block
-	blockpool BlockPool      // Block pool for new block caching
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
@@ -68,7 +66,6 @@ func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *
 		engine:    engine,
 		event:     event.GetEventhub(),
 		quitCh:    make(chan struct{}),
-		blockpool: bpool.NewBlockPool(config, log, common.READY_BLOCK_MSG),
 	}
 	return executor
 }
@@ -85,11 +82,7 @@ func (ex *Executor) Start() error {
 func (ex *Executor) listen() {
 	for {
 		select {
-		case ev := <-ex.blockReadySub.Chan():
-			height := ev.(*core.BlockReadyEvent).Height
-			if height == ex.lastHeight()+1 {
-				go ex.process()
-			}
+
 		case ev := <-ex.proposeBlockSub.Chan():
 			block := ev.(*core.ProposeBlockEvent).Block
 			go ex.proposeBlock(block)
@@ -101,6 +94,28 @@ func (ex *Executor) listen() {
 			ex.commitSub.Unsubscribe()
 			ex.blockReadySub.Unsubscribe()
 			return
+		}
+	}
+}
+
+func (ex *Executor) processLoop() {
+	for {
+		select {
+		case ev := <-ex.blockReadySub.Chan():
+			height := ev.(*core.BlockReadyEvent).Height
+			if height <= ex.chain.LastBlock().Height() {
+				continue
+			}
+			for {
+				nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
+				if nextBlk == nil {
+					break
+				}
+				if err := ex.processBlock(nextBlk); err != nil {
+					// TODO Roll back, and drop the future blocks
+					log.Errorf("failed to process block height = #%d,hash = %s, err:%s", nextBlk.Height(), nextBlk.Hash(), err)
+				}
+			}
 		}
 	}
 }
@@ -131,7 +146,7 @@ func (ex *Executor) process() error {
 	ex.processing.Store(1)
 	defer ex.processing.Store(0)
 	for {
-		nextBlk := ex.blockpool.GetBlock(ex.lastHeight() + 1)
+		nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
 		if nextBlk == nil {
 			break
 		}
@@ -140,7 +155,6 @@ func (ex *Executor) process() error {
 			return err
 		}
 	}
-	ex.blockpool.Clear(ex.lastHeight())
 	return nil
 }
 
@@ -161,10 +175,16 @@ func (ex *Executor) processBlock(block *types.Block) error {
 		return err
 	}
 
-	if err := ex.validator.ValidateBody(block, receipts); err != nil {
+	if err := ex.validator.ValidateState(block, receipts); err != nil {
 		log.Errorf("failed to validate block #%d body, err:%s", block.Height(), err)
 		return err
 	}
+
+	// Send receipts to engine
+	go ex.event.Post(&core.NewReceiptsEvent{
+		Height:   block.Height(),
+		Receipts: receipts,
+	})
 
 	// Save receipts to cache
 	ex.receiptsCache.Store(block.Height(), receipts)
@@ -189,12 +209,13 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 	// Save receipts to cache
 	ex.receiptsCache.Store(block.Height(), receipts)
 
-	if _, err := ex.engine.Finalize(block.Header, ex.state, block.Transactions, receipts); err != nil {
+	newBlk, err := ex.engine.Finalize(block.Header, ex.state, block.Transactions, receipts)
+	if err != nil {
 		log.Errorf("failed to finalize the block #%d, err:%s", block.Height(), err)
 		return err
 	}
 
-	go ex.event.Post(&core.ConsensusEvent{block})
+	go ex.event.Post(&core.ConsensusEvent{newBlk})
 	return nil
 }
 

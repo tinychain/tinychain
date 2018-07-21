@@ -10,6 +10,7 @@ import (
 	"tinychain/common"
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/op/go-logging"
+	"sync/atomic"
 )
 
 const (
@@ -25,10 +26,11 @@ type Peer interface {
 type bpsMgr struct {
 	log *logging.Logger
 
-	chain    Blockchain
-	bpsInfo  *ProducersInfo // block producers state
-	currInd  int            // index of current block producer
-	bpsCache Producers      // selected producers cache
+	dposActive bool           // check votes rate, use random selects defaultly
+	chain      Blockchain     // current blockchain
+	bpsInfo    *ProducersInfo // block producers state
+	currInd    int            // index of current block producer
+	bpsCache   atomic.Value   // selected producers cache
 
 	event *event.TypeMux
 	self  *blockProducer
@@ -48,25 +50,44 @@ func (bm *bpsMgr) get(id peer.ID) *blockProducer {
 	return bm.bpsInfo.get(id)
 }
 
-func (bm *bpsMgr) selectBPs(dpos bool) {
-	bm.currInd = 0
-	if dpos {
-		bm.bpsCache = bm.bpsInfo.getDposBPs()
-	} else {
-		bm.bpsCache = bm.bpsInfo.getRandomBPs(bm.chain.LastBlock().Hash())
+// getBPs returns the block producers at current round
+func (bm *bpsMgr) getBPs() Producers {
+	if bps := bm.bpsCache.Load(); bps != nil {
+		return bps.(Producers)
 	}
+	return bm.selectBPs()
+}
+
+// selectBPs selects the block producers set of this round according to a given rule.
+// The default rule is determined as below:
+// 1. if the rate of vote is lower than 15%, select bp randomly
+// 2. if the rate of votes is higher than 15%, select the highest 21 bps to produce blocks in turn
+func (bm *bpsMgr) selectBPs() Producers {
+	var bps Producers
+	bm.currInd = 0
+	if bm.dposActive {
+		bps = bm.bpsInfo.getDposBPs()
+	} else {
+		bps = bm.bpsInfo.getRandomBPs(bm.chain.LastBlock().Hash())
+	}
+	bm.bpsCache.Store(bps)
+	return bps
 }
 
 // reachSelfTurn checks is it the turn for self bp.
 // It will return bp obj if it's its turn.
 func (bm *bpsMgr) reachSelfTurn() *blockProducer {
-	if bm.bpsCache[bm.currInd] == bm.self {
+	producers := bm.bpsCache.Load()
+	if producers == nil {
+		bm.selectBPs()
+	}
+	bps := producers.(Producers)
+	if bps[bm.currInd].Cmp(bm.self) {
 		return bm.self
 	}
 	bm.currInd++
-	if bm.currInd > len(bm.bpsCache) {
-		// TODO check votes rate, use random selects defaultly
-		bm.selectBPs(false)
+	if bm.currInd > len(bps) {
+		bm.selectBPs()
 	}
 	return nil
 }

@@ -57,3 +57,11 @@ type ExecPendingTxEvent struct {
 }
 
 type TxBroadcastEvent struct{}
+
+/*
+	Receipts events
+ */
+type NewReceiptsEvent struct {
+	Height uint64
+	Receipts types.Receipts
+}

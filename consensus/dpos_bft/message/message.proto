@@ -5,7 +5,7 @@ message consensusMsg {
     int32 type = 1;
     uint64 seqNo = 2;
     bytes digest = 3;
-    bytes blockHash = 4;
+    bytes pubKey = 4;
     bytes signature = 5;
 }
 

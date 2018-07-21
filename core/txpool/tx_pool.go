@@ -10,6 +10,8 @@ import (
 	"tinychain/core"
 	batcher "github.com/yyh1102/go-batcher"
 	"sort"
+	"tinychain/p2p/pb"
+	"github.com/libp2p/go-libp2p-peer"
 )
 
 var (
@@ -44,9 +46,10 @@ type TxPool struct {
 	newTxSub event.Subscription
 }
 
-func NewTxPool(config *Config, validator TxValidator, state *state.StateDB, useBatch bool) *TxPool {
+func NewTxPool(config *common.Config, validator TxValidator, state *state.StateDB, useBatch bool) *TxPool {
+	conf := newConfig(config)
 	tp := &TxPool{
-		config:       config,
+		config:       conf,
 		validator:    validator,
 		event:        event.GetEventhub(),
 		all:          newTxLookup(),
@@ -57,8 +60,8 @@ func NewTxPool(config *Config, validator TxValidator, state *state.StateDB, useB
 	if useBatch {
 		batch := batcher.NewBatch(
 			"NEW_TXS",
-			config.BatchCapacity,
-			config.BatchTimeout,
+			conf.BatchCapacity,
+			conf.BatchTimeout,
 			tp.launch,
 		)
 
@@ -107,6 +110,22 @@ func (tp *TxPool) Pending() types.Transactions {
 
 	sort.Sort(types.SortedList(results))
 	return results
+}
+
+// Drop removes transactions that have been processed from tx_pool
+func (tp *TxPool) Drop(drops types.Transactions) {
+	address := make(map[common.Address]struct{})
+	for _, tx := range drops {
+		tp.all.Del(tx.Hash())
+		if _, ok := address[tx.From]; !ok {
+			address[tx.From] = struct{}{}
+		}
+	}
+
+	for addr := range address {
+		tl := tp.getPending(addr)
+		tl.Del(tp.currentState.GetNonce(addr))
+	}
 }
 
 func (tp *TxPool) Add(tx *types.Transaction) error {
@@ -272,4 +291,16 @@ func (tp *TxPool) postBatch(txs types.Transactions) {
 		batch = append(batch, tx)
 	}
 	tp.batch.Batch(batch)
+}
+
+func (tp *TxPool) Type() string {
+	return common.NEW_TX_MSG
+}
+
+func (tp *TxPool) Run(id peer.ID, message *pb.Message) error {
+
+}
+
+func (tp *TxPool) Error(err error) {
+
 }

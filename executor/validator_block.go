@@ -32,7 +32,7 @@ func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 // Validate block txs
 // 1. Validate txs root hash
 // 2. Validate receipts root hash
-func (v *BlockValidatorImpl) ValidateBody(block *types.Block, receipts types.Receipts) error {
+func (v *BlockValidatorImpl) ValidateState(block *types.Block, receipts types.Receipts) error {
 	txRoot := block.Transactions.Hash()
 	if txRoot != block.TxRoot() {
 		return ErrTxRootNotEqual

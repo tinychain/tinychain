@@ -7,6 +7,7 @@ import (
 	"sort"
 	"sync"
 	"math/rand"
+	"bytes"
 )
 
 type ProducersInfo struct {
@@ -104,8 +105,24 @@ func (bp *blockProducer) Addr() common.Address {
 	return bp.address
 }
 
+func (bp *blockProducer) PubKey() crypto.PubKey {
+	return bp.pubKey
+}
+
 func (bp *blockProducer) PrivKey() crypto.PrivKey {
 	return bp.privKey
+}
+
+func (bp *blockProducer) Cmp(p *blockProducer) bool {
+	pubKey1, err := bp.pubKey.Bytes()
+	if err != nil {
+		panic("invalid public key")
+	}
+	pubKey2, err := p.pubKey.Bytes()
+	if err != nil {
+		panic("invalid public key")
+	}
+	return bytes.Compare(pubKey1, pubKey2) == 0 && bp.id == p.id
 }
 
 type Producers []*blockProducer

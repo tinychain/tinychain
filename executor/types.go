@@ -15,5 +15,5 @@ type StateValidator interface {
 
 type BlockValidator interface {
 	ValidateHeader(block *types.Block) error
-	ValidateBody(block *types.Block, receipts types.Receipts) error
+	ValidateState(block *types.Block, receipts types.Receipts) error
 }

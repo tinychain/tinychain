@@ -9,5 +9,7 @@ const (
 	CONSENSUS_MSG      = "consensus_msg"
 	CONSENSUS_PEER_MSG = "consensus_peer_msg"
 	PROPOSE_BLOCK_MSG  = "propose_block_msg"
-	READY_BLOCK_MSG     = "ready_block_msg"
+	READY_BLOCK_MSG    = "ready_block_msg"
+
+	NEW_TX_MSG = "new_tx_msg"
 )

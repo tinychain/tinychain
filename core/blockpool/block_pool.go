@@ -30,6 +30,8 @@ type BlockPool struct {
 	blockSub event.Subscription // Subscribe new block received from p2p
 }
 
+// Create a block pool instance
+// The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
 func NewBlockPool(config *common.Config, log *logging.Logger, msgType string) *BlockPool {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
 	bp := &BlockPool{
@@ -84,16 +86,24 @@ func (bp *BlockPool) GetBlock(height uint64) *types.Block {
 	return bp.valid[height]
 }
 
+// AddBlocks add a new block to pool without validating and processing it
+func (bp *BlockPool) AddBlock(block *types.Block) error {
+	bp.mu.Lock()
+	defer bp.mu.Unlock()
+	if old := bp.valid[block.Height()]; old != nil && old.Hash() != block.Hash() {
+		return ErrBlockDuplicate
+	}
+	bp.valid[block.Height()] = block
+	return nil
+}
+
 func (bp *BlockPool) add(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	// Check block duplicate
 	old := bp.valid[block.Height()]
-	if old != nil {
-		// Replace the old block if new one has a higher gasused
-		if old.Hash() != block.Hash() && old.GasUsed() > block.GasUsed() {
-			return ErrBlockDuplicate
-		}
+	if old != nil && old.Hash() != block.Hash() {
+		return ErrBlockDuplicate
 	}
 	if bp.Size() >= bp.maxBlockSize && old == nil {
 		return ErrPoolFull

@@ -121,10 +121,33 @@ func (sdb *StateDB) StateBmt(addr common.Address) BucketTree {
 // Get or create a state object
 func (sdb *StateDB) GetOrNewStateObj(addr common.Address) *stateObject {
 	stateObj := sdb.GetStateObj(addr)
-	if stateObj != nil {
+	if stateObj == nil {
 		return sdb.CreateStateObj(addr)
 	}
 	return stateObj
+}
+
+func (sdb *StateDB) GetNonce(addr common.Address) uint64 {
+	stateObj := sdb.GetStateObj(addr)
+	if stateObj != nil {
+		return stateObj.Nonce()
+	}
+	return 0
+}
+
+func (sdb *StateDB) SetNonce(addr common.Address, nonce uint64) {
+	stateObj := sdb.GetOrNewStateObj(addr)
+	if stateObj != nil {
+		stateObj.SetNonce(nonce)
+	}
+}
+
+func (sdb *StateDB) GetBalance(addr common.Address) *big.Int {
+	stateObj := sdb.GetStateObj(addr)
+	if stateObj != nil {
+		return stateObj.Balance()
+	}
+	return nil
 }
 
 func (sdb *StateDB) SetBalance(addr common.Address, amount *big.Int) {
@@ -145,13 +168,6 @@ func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
 		stateObj.SubBalance(amount)
-	}
-}
-
-func (sdb *StateDB) SetNonce(addr common.Address, nonce uint64) {
-	stateObj := sdb.GetOrNewStateObj(addr)
-	if stateObj != nil {
-		stateObj.SetNonce(nonce)
 	}
 }
 

@@ -23,11 +23,12 @@ const (
 
 // Blockchain is the canonical chain given a database with a genesis block
 type Blockchain struct {
-	db        *db.TinyDB       // chain db
-	genesis   *types.Block     // genesis block
-	lastBlock atomic.Value     // last block of chain
-	engine    consensus.Engine // consensus engine
-	mu        sync.RWMutex
+	db             *db.TinyDB       // chain db
+	genesis        *types.Block     // genesis block
+	lastBlock      atomic.Value     // last block of chain
+	lastFinalBlock atomic.Value     // last final block of chian
+	engine         consensus.Engine // consensus engine
+	mu             sync.RWMutex
 
 	blocksCache *lru.Cache // blocks lru cache
 	headerCache *lru.Cache // headers lru cache
@@ -110,16 +111,26 @@ func (bc *Blockchain) clear() {
 	bc.headerCache.Purge()
 }
 
+// LastBlock returns the last block of latest blockchain in memory
 func (bc *Blockchain) LastBlock() *types.Block {
 	if block := bc.lastBlock.Load(); block != nil {
 		return block.(*types.Block)
 	}
+	return bc.LastFinalBlock()
+}
+
+// LastFinalBlock returns the last commited block in db
+func (bc *Blockchain) LastFinalBlock() *types.Block {
+	if fb := bc.lastFinalBlock.Load(); fb != nil {
+		return fb.(*types.Block)
+	}
 	hash, err := bc.db.GetLastBlock()
 	if err != nil {
-		log.Errorf("failed to get last block's hash from db, err:%s", err)
-		return nil
+		panic(fmt.Sprintf("failed to get last block's hash from db, err:%s", err))
 	}
-	return bc.GetBlockByHash(hash)
+	block := bc.GetBlockByHash(hash)
+	bc.lastFinalBlock.Store(block)
+	return block
 }
 
 func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {

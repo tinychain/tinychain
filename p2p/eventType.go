@@ -22,3 +22,9 @@ type MultiSendEvent struct {
 	Typ     string
 	Data    []byte
 }
+
+// Random Multicast message with p2p network layer
+type RandomSendEvnet struct {
+	Typ  string
+	Data []byte
+}
