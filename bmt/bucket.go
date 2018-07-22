@@ -63,6 +63,15 @@ func (bk *Bucket) addKey(key string) {
 	bk.Keys = append(bk.Keys, key)
 }
 
+func (bk *Bucket) delKey(key string) {
+	for i, k := range bk.Keys {
+		if k == key {
+			bk.Keys = append(bk.Keys[:i], bk.Keys[i+1:]...)
+			return
+		}
+	}
+}
+
 func (bk *Bucket) serialize() ([]byte, error) {
 	return json.Marshal(bk)
 }
@@ -138,8 +147,13 @@ func (ht *HashTable) put(key string, value []byte) error {
 	}
 	oldVal := bucket.Slots[key]
 	if bytes.Compare(oldVal, value) != 0 {
-		bucket.addKey(key)
-		bucket.Slots[key] = value
+		if value == nil {
+			bucket.delKey(key)
+			delete(bucket.Slots, key)
+		} else {
+			bucket.addKey(key)
+			bucket.Slots[key] = value
+		}
 		ht.dirty[index] = true
 	}
 	return nil
@@ -178,7 +192,7 @@ func (ht *HashTable) commit(batch *leveldb.Batch) error {
 	for i, dirty := range ht.dirty {
 		if dirty {
 			bucket := ht.buckets[i]
-			err := ht.db.PutBucket(batch,bucket.Hash(), bucket)
+			err := ht.db.PutBucket(batch, bucket.Hash(), bucket)
 			if err != nil {
 				return err
 			}

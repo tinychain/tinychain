@@ -34,7 +34,6 @@ func (db *cacheDB) GetCode(codeHash common.Hash) ([]byte, error) {
 	key := append([]byte(KeyContractCode), codeHash.Bytes()...)
 	code, err := db.db.Get(key)
 	if err != nil {
-		log.Errorf("Failed to get code with hash %s,%s", codeHash, err)
 		return nil, err
 	}
 	db.codeCache.Add(codeHash, code)

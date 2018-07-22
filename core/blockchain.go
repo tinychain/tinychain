@@ -65,7 +65,6 @@ func (bc *Blockchain) loadLastState() error {
 		return err
 	}
 
-	bc.lastBlock.Store(lastBlock)
 	bc.blocksCache.Add(lastBlock.Height(), lastBlock)
 	// TODO
 
@@ -116,7 +115,9 @@ func (bc *Blockchain) LastBlock() *types.Block {
 	if block := bc.lastBlock.Load(); block != nil {
 		return block.(*types.Block)
 	}
-	return bc.LastFinalBlock()
+	block := bc.LastFinalBlock()
+	bc.lastBlock.Store(block)
+	return block
 }
 
 // LastFinalBlock returns the last commited block in db
@@ -221,7 +222,7 @@ func (bc *Blockchain) CommitBlock(block *types.Block) error {
 		log.Errorf("failed to put last block hash to db, err:%s", err)
 		return err
 	}
-
+	bc.lastFinalBlock.Store(block)
 	return nil
 }
 

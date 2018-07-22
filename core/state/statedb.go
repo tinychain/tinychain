@@ -5,6 +5,7 @@ import (
 	"tinychain/bmt"
 	"tinychain/db/leveldb"
 	"math/big"
+	"fmt"
 )
 
 var (
@@ -22,9 +23,18 @@ type BucketTree interface {
 	Copy() *bmt.BucketTree
 }
 
+type revision struct {
+	id           int
+	journalIndex int
+}
+
 type StateDB struct {
-	db                *cacheDB
-	bmt               BucketTree                      // bucket merkle tree of global state
+	db             *cacheDB
+	nextRevisionId int
+	revision       []revision // snapshot version index manager
+	journal        *journal   // journal of undo
+	bmt            BucketTree // bucket merkle tree of global state
+
 	stateObjects      map[common.Address]*stateObject // live state objects
 	stateObjectsDirty map[common.Address]struct{}     // dirty state objects
 }
@@ -37,6 +47,7 @@ func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 	}
 	return &StateDB{
 		db:                newCacheDB(db),
+		journal:           newJournal(),
 		bmt:               tree,
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
@@ -47,6 +58,9 @@ func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 // If error, return nil
 func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 	if stateObj, exist := sdb.stateObjects[addr]; exist {
+		if stateObj.deleted {
+			return nil
+		}
 		return stateObj
 	}
 	data, err := sdb.bmt.Get(addr.Bytes())
@@ -59,8 +73,8 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 		return nil
 	}
 	stateObj := newStateObject(addr, account)
-	code, _ := sdb.db.GetCode(account.CodeHash)
-	if code != nil {
+	code, err := sdb.db.GetCode(account.CodeHash)
+	if err == nil {
 		stateObj.SetCode(code)
 	}
 	sdb.setStateObj(stateObj)
@@ -74,6 +88,7 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 		Balance: new(big.Int),
 	}
 	newObj := newStateObject(addr, account)
+	sdb.journal.append(createObjectChange{&addr})
 	sdb.setStateObj(newObj)
 	return newObj
 }
@@ -97,6 +112,11 @@ func (sdb *StateDB) GetState(addr common.Address, key common.Hash) []byte {
 func (sdb *StateDB) SetState(addr common.Address, key common.Hash, value []byte) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(storageChange{
+			Account: &addr,
+			Key:     key,
+			PreVal:  stateObj.GetState(key),
+		})
 		stateObj.SetState(key, value)
 	}
 }
@@ -121,7 +141,7 @@ func (sdb *StateDB) StateBmt(addr common.Address) BucketTree {
 // Get or create a state object
 func (sdb *StateDB) GetOrNewStateObj(addr common.Address) *stateObject {
 	stateObj := sdb.GetStateObj(addr)
-	if stateObj == nil {
+	if stateObj == nil || stateObj.deleted {
 		return sdb.CreateStateObj(addr)
 	}
 	return stateObj
@@ -138,6 +158,10 @@ func (sdb *StateDB) GetNonce(addr common.Address) uint64 {
 func (sdb *StateDB) SetNonce(addr common.Address, nonce uint64) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(nonceChange{
+			Account: &addr,
+			Prev:    stateObj.Nonce(),
+		})
 		stateObj.SetNonce(nonce)
 	}
 }
@@ -153,6 +177,10 @@ func (sdb *StateDB) GetBalance(addr common.Address) *big.Int {
 func (sdb *StateDB) SetBalance(addr common.Address, amount *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(balanceChange{
+			Account: &addr,
+			Prev:    stateObj.Balance(),
+		})
 		stateObj.SetBalance(amount)
 	}
 }
@@ -160,6 +188,10 @@ func (sdb *StateDB) SetBalance(addr common.Address, amount *big.Int) {
 func (sdb *StateDB) AddBalance(addr common.Address, amount *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(balanceChange{
+			Account: &addr,
+			Prev:    stateObj.Balance(),
+		})
 		stateObj.AddBalance(amount)
 	}
 }
@@ -167,6 +199,10 @@ func (sdb *StateDB) AddBalance(addr common.Address, amount *big.Int) {
 func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(balanceChange{
+			Account: &addr,
+			Prev:    stateObj.Balance(),
+		})
 		stateObj.SubBalance(amount)
 	}
 }
@@ -174,6 +210,11 @@ func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 func (sdb *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		sdb.journal.append(codeChange{
+			Account:  &addr,
+			PrevCode: stateObj.Code(),
+			PrevHash: stateObj.CodeHash(),
+		})
 		stateObj.SetCode(code)
 	}
 }
@@ -181,6 +222,22 @@ func (sdb *StateDB) SetCode(addr common.Address, code []byte) {
 func (sdb *StateDB) Exist(addr common.Address) bool {
 	s := sdb.GetStateObj(addr)
 	return s != nil
+}
+
+func (sdb *StateDB) Suicide(addr common.Address) bool {
+	obj := sdb.GetStateObj(addr)
+	if obj == nil {
+		return false
+	}
+
+	sdb.journal.append(suicideChange{
+		Account:     &addr,
+		prev:        obj.suicided,
+		prevBalance: obj.Balance(),
+	})
+	obj.markSuicided()
+	obj.SetBalance(new(big.Int))
+	return true
 }
 
 // Process dirty state object to state tree and get intermediate root
@@ -200,22 +257,30 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 	dirtySet := bmt.NewWriteSet()
 
-	for addr := range sdb.stateObjectsDirty {
-		delete(sdb.stateObjectsDirty, addr)
-		stateobj := sdb.stateObjects[addr]
-		// Put account data to dirtySet
-		data, _ := stateobj.data.Serialize()
-		dirtySet[addr.String()] = data
+	for addr, stateObj := range sdb.stateObjects {
+		_, isDirty := sdb.stateObjectsDirty[addr]
+		switch {
+		case stateObj.suicided || (isDirty && stateObj.empty()):
+			// Delete stateObject
+			stateObj.deleted = true
+			dirtySet[addr.String()] = nil
+		case isDirty:
+			stateobj := sdb.stateObjects[addr]
+			// Put account data to dirtySet to update world state tree
+			data, _ := stateobj.data.Serialize()
+			dirtySet[addr.String()] = data
 
-		// Put code bytes to codeSet
-		if stateobj.dirtyCode {
-			if err := sdb.db.PutCode(stateobj.CodeHash(), stateobj.Code()); err != nil {
-				stateobj.dirtyCode = false
+			// Put code bytes to codeSet
+			if stateobj.dirtyCode {
+				if err := sdb.db.PutCode(stateobj.CodeHash(), stateobj.Code()); err != nil {
+					stateobj.dirtyCode = false
+				}
+			}
+			if err := stateobj.Commit(batch); err != nil {
+				return common.Hash{}, err
 			}
 		}
-		if err := stateobj.Commit(batch); err != nil {
-			return common.Hash{}, err
-		}
+		delete(sdb.stateObjectsDirty, addr)
 	}
 
 	if err := sdb.bmt.Prepare(dirtySet); err != nil {
@@ -225,4 +290,33 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	return sdb.bmt.Hash(), nil
+}
+
+// Snapshot returns an identifier for the current revision of the state.
+func (sdb *StateDB) Snapshot() int {
+	id := sdb.nextRevisionId
+	sdb.nextRevisionId++
+	sdb.revision = append(sdb.revision, revision{id, sdb.journal.length()})
+	return id
+}
+
+func (sdb *StateDB) RevertToSnapshot(revid int) {
+	// Find the snapshot in the current revision
+	var idx int
+	for i, revision := range sdb.revision {
+		if revision.id >= revid {
+			idx = i
+			break
+		}
+	}
+
+	if idx == len(sdb.revision) || sdb.revision[idx].id != revid {
+		panic(fmt.Sprintf("revision id %v cannot be reverted", revid))
+	}
+
+	snapshot := sdb.revision[idx].journalIndex
+
+	// Replay the journal to undo changes and remove invalid snapshots
+	sdb.journal.revert(sdb, snapshot)
+	sdb.revision = sdb.revision[:revid]
 }

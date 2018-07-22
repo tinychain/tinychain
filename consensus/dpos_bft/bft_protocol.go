@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"github.com/libp2p/go-libp2p-crypto"
 	"bytes"
+	"tinychain/core"
 )
 
 var (
@@ -21,9 +22,11 @@ var (
 	errDigestNotMatch   = errors.New("digest is invalid")
 	errSignatureInvalid = errors.New("signature is invalid")
 	errReceiptNotMatch  = errors.New("receipt is not match the block header receiptHash")
+	errCommitTimeout    = errors.New("commit timeout")
 
-	loopReadBlockGap     = 500 * time.Millisecond
-	loopReadBlockTimeout = 10 * time.Second
+	loopReadBlockGap     = 500 * time.Millisecond // read block gap in loop
+	loopReadBlockTimeout = 10 * time.Second       // read block timeout
+	commitTimeout        = 5 * time.Second        // commit timeout
 )
 
 // Type implements the `Protocol` interface, and returns the message type of consensus engine
@@ -103,6 +106,7 @@ func (eg *Engine) startBFT() error {
 		log.Errorf("failed to convert pubkey to bytes, err:%s", err)
 		return err
 	}
+	eg.bftState.Store(PRE_COMMIT)
 	return eg.multicastConsensus(&msg.ConsensusMsg{
 		Type:      PRE_COMMIT,
 		SeqNo:     eg.SeqNo(),
@@ -123,7 +127,7 @@ func (eg *Engine) preCommit(message *msg.ConsensusMsg) error {
 	}
 	block, err := eg.fetchBlockLoop(message.SeqNo)
 	if err != nil {
-		log.Errorf("err: %s", err)
+		log.Errorf("failed to fetch block from block_pool, err: %s", err)
 		return err
 	}
 
@@ -146,6 +150,7 @@ func (eg *Engine) preCommit(message *msg.ConsensusMsg) error {
 		return err
 	}
 
+	eg.bftState.Store(COMMIT)
 	return eg.multicastConsensus(&msg.ConsensusMsg{
 		Type:      COMMIT,
 		SeqNo:     eg.SeqNo(),
@@ -160,6 +165,42 @@ func (eg *Engine) commit(message *msg.ConsensusMsg) error {
 	eg.commitVotes += 1
 	if eg.commitVotes <= eg.config.RoundSize*2/3 {
 		return nil
+	}
+
+	block, err := eg.fetchBlockLoop(eg.SeqNo())
+	if err != nil {
+		log.Errorf("failed to fetch block from block_pool, err: %s", err)
+		return err
+	}
+
+	go eg.event.Post(&core.CommitBlockEvent{
+		Block: block,
+	})
+
+	timeout := time.NewTimer(commitTimeout)
+	select {
+	case ev := <-eg.commitCompleteSub.Chan():
+		// Commit complete
+		if height := ev.(*core.CommitCompleteEvent).Height; height != eg.SeqNo() {
+			return errors.New(fmt.Sprintf("commit height is #%d, but current seqNo in bft process is #%d", height, eg.SeqNo()))
+		}
+		digest, pubkey, sign, err := eg.computeConsensusInfo(block)
+		if err != nil {
+			return err
+		}
+		if err := eg.multicastConsensus(&msg.ConsensusMsg{
+			Type:      COMMIT,
+			SeqNo:     eg.SeqNo(),
+			Digest:    digest,
+			PubKey:    pubkey,
+			Signature: sign,
+		}); err != nil {
+			return err
+		}
+		eg.nextBFTRound()
+		return eg.startBFT()
+	case <-timeout.C:
+		return errCommitTimeout
 	}
 
 }
@@ -217,11 +258,6 @@ func (eg *Engine) checkReceipts(block *types.Block, receipts types.Receipts) err
 		return errReceiptNotMatch
 	}
 	return nil
-}
-
-// checkCommit checks the COMMIT message is valid or not
-func (eg *Engine) checkCommit() error {
-
 }
 
 func (eg *Engine) computeConsensusInfo(block *types.Block) (digest []byte, pubKey []byte, sign []byte, err error) {

@@ -73,7 +73,7 @@ func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *
 func (ex *Executor) Start() error {
 	ex.blockReadySub = ex.event.Subscribe(&core.ExecBlockEvent{})
 	ex.proposeBlockSub = ex.event.Subscribe(&core.ProposeBlockEvent{})
-	ex.commitSub = ex.event.Subscribe(&core.CommitBlock{})
+	ex.commitSub = ex.event.Subscribe(&core.CommitBlockEvent{})
 
 	go ex.listen()
 	return nil
@@ -87,7 +87,7 @@ func (ex *Executor) listen() {
 			block := ev.(*core.ProposeBlockEvent).Block
 			go ex.proposeBlock(block)
 		case ev := <-ex.commitSub.Chan():
-			block := ev.(*core.CommitBlock).Block
+			block := ev.(*core.CommitBlockEvent).Block
 			go ex.commit(block)
 		case <-ex.quitCh:
 			ex.proposeBlockSub.Unsubscribe()

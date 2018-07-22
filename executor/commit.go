@@ -4,6 +4,7 @@ import (
 	"tinychain/core/types"
 	"tinychain/common"
 	"tinychain/db"
+	"tinychain/core"
 )
 
 func (ex *Executor) commit(block *types.Block) error {
@@ -36,6 +37,9 @@ func (ex *Executor) commit(block *types.Block) error {
 		return err
 	}
 	log.Infof("New block height = #%d commits. Hash = %s", block.Height(), block.Hash().Hex())
+	go ex.event.Post(&core.CommitCompleteEvent{
+		Height: block.Height(),
+	})
 	return nil
 }
 

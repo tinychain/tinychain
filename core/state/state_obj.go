@@ -8,6 +8,10 @@ import (
 	"tinychain/bmt"
 )
 
+var (
+	emptyCodeHash = common.Sha256(nil)
+)
+
 // Value is not actually hash, but just a 32 bytes array
 type Storage map[common.Hash][]byte
 
@@ -21,6 +25,8 @@ type stateObject struct {
 	dirtyStorage Storage // dirty storage
 
 	dirtyCode bool // code is updated or not
+	suicided   bool
+	deleted   bool
 }
 
 type Account struct {
@@ -155,4 +161,12 @@ func (s *stateObject) deepCopy() *stateObject {
 		sobj.bmt = tree.Copy()
 	}
 	return s
+}
+
+func (s *stateObject) empty() bool {
+	return s.data.Nonce == 0 && s.data.Balance.Sign() == 0 && s.data.CodeHash == emptyCodeHash
+}
+
+func (s *stateObject) markSuicided() {
+	s.suicided = true
 }

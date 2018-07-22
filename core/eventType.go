@@ -37,8 +37,12 @@ type ConsensusEvent struct {
 	Block *types.Block
 }
 
-type CommitBlock struct {
+type CommitBlockEvent struct {
 	Block *types.Block
+}
+
+type CommitCompleteEvent struct {
+	Height uint64
 }
 
 /*
@@ -62,6 +66,6 @@ type TxBroadcastEvent struct{}
 	Receipts events
  */
 type NewReceiptsEvent struct {
-	Height uint64
+	Height   uint64
 	Receipts types.Receipts
 }

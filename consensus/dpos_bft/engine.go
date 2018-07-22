@@ -35,6 +35,7 @@ type BlockPool interface {
 	p2p.Protocol
 	GetBlock(height uint64) *types.Block
 	AddBlock(block *types.Block) error
+	DelBlock(height uint64)
 	Clear(height uint64)
 }
 
@@ -72,9 +73,10 @@ type Engine struct {
 	event  *event.TypeMux
 	quitCh chan struct{}
 
-	newTxsSub    event.Subscription // Subscribe new txs event from tx_pool
-	consensusSub event.Subscription // Subscribe kick_off bft event
-	receiptsSub  event.Subscription // Subscribe receipts event from executor
+	newTxsSub         event.Subscription // Subscribe new txs event from tx_pool
+	consensusSub      event.Subscription // Subscribe kick_off bft event
+	receiptsSub       event.Subscription // Subscribe receipts event from executor
+	commitCompleteSub event.Subscription
 }
 
 func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.ID) (*Engine, error) {
@@ -113,6 +115,7 @@ func (eg *Engine) Start() error {
 
 	go eg.listen()
 	go eg.proposeLoop()
+	go eg.startBFT()
 	return nil
 }
 
@@ -121,6 +124,14 @@ func (eg *Engine) init() {
 	eg.bftState.Store(PROPOSE)
 	eg.preCommitVotes = 0
 	eg.commitVotes = 0
+}
+
+func (eg *Engine) nextBFTRound() {
+	seqNo := eg.SeqNo()
+	eg.blockPool.DelBlock(seqNo)
+	eg.receipts.Delete(seqNo)
+
+	eg.init()
 }
 
 func (eg *Engine) Stop() error {
