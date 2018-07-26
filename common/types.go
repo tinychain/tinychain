@@ -93,6 +93,7 @@ func HashToAddr(hash Hash) Address {
 	return BytesToAddress(hash[:AddressLength])
 }
 
+// Decode address in hex format to common.Address
 func DecodeAddr(d []byte) Address {
 	dec := make([]byte, AddressLength)
 	hex.Decode(dec, d[2:])

@@ -3,8 +3,6 @@
 
 共识算法有以下几种选择——
 
-## DPOS + BFT
-### 阶段一: Random-selected + BFT
-由于DPOS算法需要用户投票，而在主网启动之初，全网投票比例较低，无法真正满足DPOS的设计理念（少部分用户的权益代理不能决定系统的走向），因此，在全网投票比例达到一个设定的阈值（如EOS为15%）之前，将采用BP随机出块的共识机制。
+## VRF + BFT
 
-### 阶段二: DPOS + BFT
+VRF(Verifiable Random Function)

@@ -28,3 +28,8 @@ type RandomSendEvnet struct {
 	Typ  string
 	Data []byte
 }
+
+type BroadcastEvent struct {
+	Typ  string
+	Data []byte
+}

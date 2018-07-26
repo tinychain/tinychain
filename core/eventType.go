@@ -26,7 +26,7 @@ type ExecFinishEvent struct {
 }
 
 type BlockReadyEvent struct {
-	Height uint64
+	Block *types.Block
 }
 
 type ProposeBlockEvent struct {
@@ -42,7 +42,7 @@ type CommitBlockEvent struct {
 }
 
 type CommitCompleteEvent struct {
-	Height uint64
+	Block *types.Block
 }
 
 /*

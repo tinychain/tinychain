@@ -110,7 +110,7 @@ func (bp *BlockPool) add(block *types.Block) error {
 	}
 
 	bp.valid[block.Height()] = block
-	go bp.event.Post(&core.BlockReadyEvent{block.Height()})
+	go bp.event.Post(&core.BlockReadyEvent{block})
 	return nil
 }
 

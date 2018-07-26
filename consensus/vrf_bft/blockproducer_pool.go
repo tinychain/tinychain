@@ -1,8 +1,8 @@
-package dpos_bft
+package vrf_bft
 
 import (
 	"tinychain/p2p/pb"
-	msg "tinychain/consensus/dpos_bft/message"
+	msg "tinychain/consensus/vrf_bft/message"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/golang/protobuf/proto"
 	"tinychain/event"
@@ -22,8 +22,8 @@ type Peer interface {
 	ID() peer.ID
 }
 
-// bpsMgr manage and operate block producers' state at a certain consensus round
-type bpsMgr struct {
+// bpPool manage and operate block producers' state at a certain consensus round
+type bpPool struct {
 	log *logging.Logger
 
 	dposActive bool           // check votes rate, use random selects defaultly
@@ -36,8 +36,8 @@ type bpsMgr struct {
 	self  *blockProducer
 }
 
-func newBPsMgr(config *Config, log *logging.Logger, bp *blockProducer, chain Blockchain) *bpsMgr {
-	return &bpsMgr{
+func newBpPool(config *Config, log *logging.Logger, bp *blockProducer, chain Blockchain) *bpPool {
+	return &bpPool{
 		log:     log,
 		self:    bp,
 		chain:   chain,
@@ -46,12 +46,12 @@ func newBPsMgr(config *Config, log *logging.Logger, bp *blockProducer, chain Blo
 	}
 }
 
-func (bm *bpsMgr) get(id peer.ID) *blockProducer {
+func (bm *bpPool) get(id peer.ID) *blockProducer {
 	return bm.bpsInfo.get(id)
 }
 
 // getBPs returns the block producers at current round
-func (bm *bpsMgr) getBPs() Producers {
+func (bm *bpPool) getBPs() Producers {
 	if bps := bm.bpsCache.Load(); bps != nil {
 		return bps.(Producers)
 	}
@@ -62,7 +62,7 @@ func (bm *bpsMgr) getBPs() Producers {
 // The default rule is determined as below:
 // 1. if the rate of vote is lower than 15%, select bp randomly
 // 2. if the rate of votes is higher than 15%, select the highest 21 bps to produce blocks in turn
-func (bm *bpsMgr) selectBPs() Producers {
+func (bm *bpPool) selectBPs() Producers {
 	var bps Producers
 	bm.currInd = 0
 	if bm.dposActive {
@@ -76,7 +76,7 @@ func (bm *bpsMgr) selectBPs() Producers {
 
 // reachSelfTurn checks is it the turn for self bp.
 // It will return bp obj if it's its turn.
-func (bm *bpsMgr) reachSelfTurn() *blockProducer {
+func (bm *bpPool) reachSelfTurn() *blockProducer {
 	producers := bm.bpsCache.Load()
 	if producers == nil {
 		bm.selectBPs()
@@ -92,22 +92,22 @@ func (bm *bpsMgr) reachSelfTurn() *blockProducer {
 	return nil
 }
 
-func (bm *bpsMgr) add(id peer.ID, pubKey crypto.PubKey) {
+func (bm *bpPool) add(id peer.ID, pubKey crypto.PubKey) {
 	bm.bpsInfo.add(&blockProducer{
 		id:     id,
 		pubKey: pubKey,
 	})
 }
 
-func (bm *bpsMgr) count() int {
+func (bm *bpPool) count() int {
 	return bm.bpsInfo.len()
 }
 
-func (bm *bpsMgr) Type() string {
+func (bm *bpPool) Type() string {
 	return common.CONSENSUS_PEER_MSG
 }
 
-func (bm *bpsMgr) Run(pid peer.ID, message *pb.Message) error {
+func (bm *bpPool) Run(pid peer.ID, message *pb.Message) error {
 	peerMsg := msg.PeerMsg{}
 	err := proto.Unmarshal(message.Data, &peerMsg)
 	if err != nil {
@@ -148,6 +148,6 @@ func (bm *bpsMgr) Run(pid peer.ID, message *pb.Message) error {
 	return nil
 }
 
-func (bm *bpsMgr) Error(err error) {
-	bm.log.Errorf("bpsMgr error: %s", err)
+func (bm *bpPool) Error(err error) {
+	bm.log.Errorf("bpPool error: %s", err)
 }

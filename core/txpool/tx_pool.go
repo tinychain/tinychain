@@ -12,6 +12,7 @@ import (
 	"sort"
 	"tinychain/p2p/pb"
 	"github.com/libp2p/go-libp2p-peer"
+	"encoding/json"
 )
 
 var (
@@ -43,7 +44,7 @@ type TxPool struct {
 	// map[common.Address]*txList
 	queue sync.Map
 
-	newTxSub event.Subscription
+	newTxSub event.Subscription // receive tx generated from local
 }
 
 func NewTxPool(config *common.Config, validator TxValidator, state *state.StateDB, useBatch bool) *TxPool {
@@ -298,7 +299,13 @@ func (tp *TxPool) Type() string {
 }
 
 func (tp *TxPool) Run(id peer.ID, message *pb.Message) error {
-
+	tx := types.Transaction{}
+	json.Unmarshal(message.Data, &tx)
+	if err := tp.add(&tx); err != nil {
+		log.Errorf("txpool error: failed to add tx into pool, err:%s", err)
+		return err
+	}
+	return nil
 }
 
 func (tp *TxPool) Error(err error) {

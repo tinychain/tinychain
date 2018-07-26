@@ -20,11 +20,6 @@ var (
 	log = common.GetLogger("executor")
 )
 
-type BlockPool interface {
-	GetBlock(height uint64) *types.Block
-	Clear(height uint64)
-}
-
 // Processor represents the interface of block processor
 type Processor interface {
 	Process(block *types.Block) (types.Receipts, error)
@@ -51,7 +46,7 @@ type Executor struct {
 
 	processing atomic.Value // Processing state, 1 means processing, 0 means idle
 
-	blockReadySub   event.Subscription // Subscribe new block ready event from block_pool
+	execBlockSub    event.Subscription // Subscribe new block ready event from block_pool
 	proposeBlockSub event.Subscription // Subscribe propose new block event
 	commitSub       event.Subscription // Subscribe state commit event
 }
@@ -71,7 +66,7 @@ func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *
 }
 
 func (ex *Executor) Start() error {
-	ex.blockReadySub = ex.event.Subscribe(&core.ExecBlockEvent{})
+	ex.execBlockSub = ex.event.Subscribe(&core.ExecBlockEvent{})
 	ex.proposeBlockSub = ex.event.Subscribe(&core.ProposeBlockEvent{})
 	ex.commitSub = ex.event.Subscribe(&core.CommitBlockEvent{})
 
@@ -82,40 +77,20 @@ func (ex *Executor) Start() error {
 func (ex *Executor) listen() {
 	for {
 		select {
-
 		case ev := <-ex.proposeBlockSub.Chan():
 			block := ev.(*core.ProposeBlockEvent).Block
 			go ex.proposeBlock(block)
+		case ev := <-ex.execBlockSub.Chan():
+			block := ev.(*core.ExecBlockEvent).Block
+			go ex.processBlock(block)
 		case ev := <-ex.commitSub.Chan():
 			block := ev.(*core.CommitBlockEvent).Block
 			go ex.commit(block)
 		case <-ex.quitCh:
 			ex.proposeBlockSub.Unsubscribe()
 			ex.commitSub.Unsubscribe()
-			ex.blockReadySub.Unsubscribe()
+			ex.execBlockSub.Unsubscribe()
 			return
-		}
-	}
-}
-
-func (ex *Executor) processLoop() {
-	for {
-		select {
-		case ev := <-ex.blockReadySub.Chan():
-			height := ev.(*core.BlockReadyEvent).Height
-			if height <= ex.chain.LastBlock().Height() {
-				continue
-			}
-			for {
-				nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
-				if nextBlk == nil {
-					break
-				}
-				if err := ex.processBlock(nextBlk); err != nil {
-					// TODO Roll back, and drop the future blocks
-					log.Errorf("failed to process block height = #%d,hash = %s, err:%s", nextBlk.Height(), nextBlk.Hash(), err)
-				}
-			}
 		}
 	}
 }
@@ -137,26 +112,26 @@ func (ex *Executor) processState() int {
 	return 0
 }
 
-// process set a infinite loop to process block in the order of height.
-func (ex *Executor) process() error {
-	isProcessing := ex.processState()
-	if isProcessing == 1 {
-		return nil
-	}
-	ex.processing.Store(1)
-	defer ex.processing.Store(0)
-	for {
-		nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
-		if nextBlk == nil {
-			break
-		}
-		if err := ex.processBlock(nextBlk); err != nil {
-			// TODO Roll back, and drop the future blocks
-			return err
-		}
-	}
-	return nil
-}
+//// process set a infinite loop to process block in the order of height.
+//func (ex *Executor) process() error {
+//	isProcessing := ex.processState()
+//	if isProcessing == 1 {
+//		return nil
+//	}
+//	ex.processing.Store(1)
+//	defer ex.processing.Store(0)
+//	for {
+//		nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
+//		if nextBlk == nil {
+//			break
+//		}
+//		if err := ex.processBlock(nextBlk); err != nil {
+//			// TODO Roll back, and drop the future blocks
+//			return err
+//		}
+//	}
+//	return nil
+//}
 
 // processBlock process the validation and execution of a received block from other peers
 func (ex *Executor) processBlock(block *types.Block) error {
@@ -180,12 +155,6 @@ func (ex *Executor) processBlock(block *types.Block) error {
 		return err
 	}
 
-	// Send receipts to engine
-	go ex.event.Post(&core.NewReceiptsEvent{
-		Height:   block.Height(),
-		Receipts: receipts,
-	})
-
 	// Save receipts to cache
 	ex.receiptsCache.Store(block.Height(), receipts)
 
@@ -193,6 +162,12 @@ func (ex *Executor) processBlock(block *types.Block) error {
 		log.Errorf("failed to add block to blockchain cache, err:%s", err)
 		return err
 	}
+
+	// Send receipts to engine
+	go ex.event.Post(&core.NewReceiptsEvent{
+		Height:   block.Height(),
+		Receipts: receipts,
+	})
 
 	return nil
 }

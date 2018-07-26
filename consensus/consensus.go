@@ -1,20 +1,26 @@
 package consensus
 
 import (
-	"tinychain/consensus/dpos_bft"
 	"tinychain/core/types"
 	"tinychain/common"
 	"tinychain/core/state"
 	"tinychain/core"
 	"github.com/libp2p/go-libp2p-peer"
 	"tinychain/p2p"
-	"tinychain/core/blockpool"
+	"tinychain/consensus/vrf_bft"
 )
+
+type BlockPool interface {
+	p2p.Protocol
+	GetBlock(height uint64) *types.Block
+	AddBlock(block *types.Block) error
+	DelBlock(height uint64)
+	Clear(height uint64)
+}
 
 type Engine interface {
 	Start() error
 	Stop() error
-	BlockPool() blockpool.BlockPool
 	Protocols() []p2p.Protocol
 	Finalize(header *types.Header, state *state.StateDB, txs types.Transactions, receipts types.Receipts) (*types.Block, error)
 }
@@ -28,5 +34,5 @@ type TxPool interface {
 }
 
 func New(config *common.Config, state *state.StateDB, chain *core.Blockchain, id peer.ID) (Engine, error) {
-	return dpos_bft.New(config, state, chain, id)
+	return vrf_bft.New(config, state, chain, id)
 }

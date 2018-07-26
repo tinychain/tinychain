@@ -1,8 +1,8 @@
-package dpos_bft
+package vrf_bft
 
 import (
 	"tinychain/p2p/pb"
-	msg "tinychain/consensus/dpos_bft/message"
+	msg "tinychain/consensus/vrf_bft/message"
 	"github.com/golang/protobuf/proto"
 	"errors"
 	"github.com/libp2p/go-libp2p-peer"
@@ -17,12 +17,13 @@ import (
 )
 
 var (
-	errPeerIdNotFound   = errors.New("invalid bp: it's peer ID is not found in selected BP set")
-	errUnknownType      = errors.New("unknown message type")
-	errDigestNotMatch   = errors.New("digest is invalid")
-	errSignatureInvalid = errors.New("signature is invalid")
-	errReceiptNotMatch  = errors.New("receipt is not match the block header receiptHash")
-	errCommitTimeout    = errors.New("commit timeout")
+	errPeerIdNotFound      = errors.New("invalid bp: it's peer ID is not found in selected BP set")
+	errUnknownType         = errors.New("unknown message type")
+	errDigestNotMatch      = errors.New("digest is invalid")
+	errSignatureInvalid    = errors.New("signature is invalid")
+	errReceiptNotMatch     = errors.New("receipt is not match the block header receiptHash")
+	errProcessBlockTimeout = errors.New("process block timeout")
+	errCommitTimeout       = errors.New("commit timeout")
 
 	loopReadBlockGap     = 500 * time.Millisecond // read block gap in loop
 	loopReadBlockTimeout = 10 * time.Second       // read block timeout
@@ -44,7 +45,7 @@ func (eg *Engine) Run(pid peer.ID, message *pb.Message) error {
 
 	var found bool
 	// Check peer.ID is in BP set or not
-	for _, bp := range eg.bps.getBPs() {
+	for _, bp := range eg.bpPool.getBPs() {
 		if bp.id == pid {
 			found = true
 			break
@@ -137,6 +138,17 @@ func (eg *Engine) preCommit(message *msg.ConsensusMsg) error {
 		return err
 	}
 
+	go eg.event.Post(&core.ExecBlockEvent{block})
+
+	timeout := time.NewTimer(eg.config.ProcessTimeout)
+	select {
+	case <-timeout.C:
+		eg.nextBFTRound()
+		return errProcessBlockTimeout
+	case <-eg.execCompleteChan:
+		// do nothing
+	}
+
 	// Check receipts have exist in consensus engine and match the block or not
 	if receipts, ok := eg.receipts.Load(message.SeqNo); ok {
 		if err := eg.checkReceipts(block, receipts.(types.Receipts)); err != nil {
@@ -181,8 +193,8 @@ func (eg *Engine) commit(message *msg.ConsensusMsg) error {
 	select {
 	case ev := <-eg.commitCompleteSub.Chan():
 		// Commit complete
-		if height := ev.(*core.CommitCompleteEvent).Height; height != eg.SeqNo() {
-			return errors.New(fmt.Sprintf("commit height is #%d, but current seqNo in bft process is #%d", height, eg.SeqNo()))
+		if block := ev.(*core.CommitCompleteEvent).Block; block.Height() != eg.SeqNo() {
+			return errors.New(fmt.Sprintf("commit height is #%d, but current seqNo in bft process is #%d", block.Height(), eg.SeqNo()))
 		}
 		digest, pubkey, sign, err := eg.computeConsensusInfo(block)
 		if err != nil {
@@ -198,6 +210,7 @@ func (eg *Engine) commit(message *msg.ConsensusMsg) error {
 			return err
 		}
 		eg.nextBFTRound()
+
 		return eg.startBFT()
 	case <-timeout.C:
 		return errCommitTimeout
@@ -207,7 +220,7 @@ func (eg *Engine) commit(message *msg.ConsensusMsg) error {
 
 func (eg *Engine) multicastConsensus(message *msg.ConsensusMsg) error {
 	var pids []peer.ID
-	for _, bp := range eg.bps.getBPs() {
+	for _, bp := range eg.bpPool.getBPs() {
 		pids = append(pids, bp.id)
 	}
 
