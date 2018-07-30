@@ -18,6 +18,11 @@ type BlockPool interface {
 	Clear(height uint64)
 }
 
+type BlockValidator interface {
+	ValidateHeader(block *types.Block) error
+	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error
+}
+
 type Engine interface {
 	Start() error
 	Stop() error

@@ -13,10 +13,10 @@ import (
 	"tinychain/consensus/blockpool"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-peer"
-	"tinychain/core/txpool"
-	"tinychain/executor"
 	"sync"
 	"tinychain/consensus"
+	"tinychain/executor"
+	"tinychain/core/txpool"
 )
 
 var (
@@ -33,6 +33,8 @@ const (
 )
 
 type TxPool interface {
+	Start()
+	Stop()
 	Pending() types.Transactions
 	Drop(transactions types.Transactions)
 }
@@ -51,64 +53,77 @@ type Blockchain interface {
 type Engine struct {
 	config *Config
 
-	state            *state.StateDB      // current state
-	seqNo            atomic.Value        // next block height at bft processing
-	chain            Blockchain          // current blockchain
-	bpPool           *bpPool             // manage and operate block producers' info
-	blockPool        consensus.BlockPool // pool to retrieves new proposed blocks
-	txPool           TxPool              // TxPool used to filter out valid transactions
-	receipts         sync.Map            // save receipts of block map[uint64]receipts
-	execCompleteChan chan struct{}       // channel for informing the process is completed
+	state            *state.StateDB           // current state
+	seqNo            atomic.Value             // next block height at bft processing
+	chain            Blockchain               // current blockchain
+	bpPool           *bpPool                  // manage and operate block producers' info
+	blockPool        consensus.BlockPool      // pool to retrieves new proposed blocks
+	txPool           TxPool                   // TxPool used to filter out valid transactions
+	receipts         sync.Map                 // save receipts of block map[uint64]receipts
+	validator        consensus.BlockValidator // Block validator to validate state
+	execCompleteChan chan struct{}            // channel for informing the process is completed
 
 	bftState       atomic.Value // the state of current bft period
 	preCommitVotes int          // pre-commit votes statistics
 	commitVotes    int          // commit votes statistics
 
-	event  *event.TypeMux
-	quitCh chan struct{}
+	event       *event.TypeMux
+	processLock chan struct{}
+	quitCh      chan struct{}
 
+	newBlockSub       event.Subscription // Subscribe new block from block pool
 	consensusSub      event.Subscription // Subscribe kick_off bft event
 	receiptsSub       event.Subscription // Subscribe receipts event from executor
-	commitCompleteSub event.Subscription
+	commitCompleteSub event.Subscription // Subscribe commit complete event from executor
 }
 
-func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.ID) (*Engine, error) {
+func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.ID, validator consensus.BlockValidator) (*Engine, error) {
 	conf := newConfig(config)
-	privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
-	if err != nil {
-		return nil, err
-	}
-	// init block producer info
-	self := &blockProducer{
-		id:      id,
-		privKey: privKey,
-	}
-
-	return &Engine{
+	engine := &Engine{
 		config:           conf,
 		chain:            chain,
 		state:            state,
-		bpPool:           newBpPool(conf, log, self, chain),
 		event:            event.GetEventhub(),
-		blockPool:        blockpool.NewBlockPool(config, log, common.PROPOSE_BLOCK_MSG),
-		txPool:           txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, false),
+		validator:        validator,
+		blockPool:        blockpool.NewBlockPool(config, validator, log, common.PROPOSE_BLOCK_MSG),
 		execCompleteChan: make(chan struct{}),
 		quitCh:           make(chan struct{}),
-	}, nil
+	}
+	// init block producer info
+	self := &blockProducer{
+		id: id,
+	}
+	if conf.BP {
+		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
+		if err != nil {
+			return nil, err
+		}
+		self.privKey = privKey
+		engine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, false, false)
+	} else {
+		engine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, true)
+	}
+	engine.bpPool = newBpPool(conf, log, self, chain)
+
+	return engine, nil
 }
 
 func (eg *Engine) Start() error {
-	eg.init()
-
+	eg.newBlockSub = eg.event.Subscribe(&core.BlockReadyEvent{})
 	eg.consensusSub = eg.event.Subscribe(&core.ConsensusEvent{})
 	eg.receiptsSub = eg.event.Subscribe(&core.NewReceiptsEvent{})
+	eg.commitCompleteSub = eg.event.Subscribe(&core.CommitCompleteEvent{})
 
 	// Get last height of final block
 	eg.seqNo.Store(eg.chain.LastFinalBlock().Height())
 
 	go eg.listen()
-	go eg.proposeLoop()
-	go eg.startBFT()
+	if eg.config.BP {
+		eg.init()
+		go eg.proposeLoop()
+		go eg.startBFT()
+	}
+	go eg.txPool.Start()
 	return nil
 }
 
@@ -129,6 +144,7 @@ func (eg *Engine) nextBFTRound() {
 }
 
 func (eg *Engine) Stop() error {
+	eg.txPool.Stop()
 	eg.quitCh <- struct{}{}
 	return nil
 }
@@ -136,13 +152,20 @@ func (eg *Engine) Stop() error {
 func (eg *Engine) listen() {
 	for {
 		select {
+		case ev := <-eg.newBlockSub.Chan():
+			block := ev.(*core.BlockReadyEvent).Block
+			if eg.config.BP {
+				go eg.multicastBlock(block)
+			} else {
+				go eg.broadcast(block)
+			}
 		case ev := <-eg.consensusSub.Chan():
 			block := ev.(*core.ConsensusEvent).Block
 			eg.blockPool.AddBlock(block)
 			eg.multicastBlock(block)
 		case ev := <-eg.receiptsSub.Chan():
 			rev := ev.(*core.NewReceiptsEvent)
-			eg.setReceipts(rev.Height, rev.Receipts)
+			eg.setReceipts(rev.Block.Height(), rev.Receipts)
 			eg.execCompleteChan <- struct{}{}
 		case <-eg.quitCh:
 			eg.consensusSub.Unsubscribe()
@@ -222,6 +245,17 @@ func (eg *Engine) proposeBlock(txs types.Transactions) {
 	log.Infof("Block producer %s propose a new block, height = #%d", eg.Address(), block.Height())
 }
 
+// process processes the block received from the solo BP.
+// It is invoked by not-BP peers.
+func (eg *Engine) process() {
+	<-eg.processLock
+	block := eg.blockPool.GetBlock(eg.chain.LastBlock().Height() + 1)
+	if block != nil {
+		go eg.event.Post(&core.ExecBlockEvent{block})
+	}
+}
+
+// multicastBlock send the new proposed block to other BPs
 func (eg *Engine) multicastBlock(block *types.Block) error {
 	var pids []peer.ID
 	for _, bp := range eg.bpPool.getBPs() {
@@ -237,6 +271,18 @@ func (eg *Engine) multicastBlock(block *types.Block) error {
 		Data:    data,
 	})
 	eg.bftState.Store(PRE_COMMIT)
+	return nil
+}
+
+func (eg *Engine) broadcast(block *types.Block) error {
+	data, err := block.Serialize()
+	if err != nil {
+		return err
+	}
+	go eg.event.Post(&p2p.BroadcastEvent{
+		Typ:  common.PROPOSE_BLOCK_MSG,
+		Data: data,
+	})
 	return nil
 }
 

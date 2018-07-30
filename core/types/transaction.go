@@ -156,6 +156,14 @@ func (txs Transactions) Commit(db *leveldb.LDBDatabase) error {
 	return bmt.Commit(txSet, db)
 }
 
+func (txs Transactions) Serialize() ([]byte, error) {
+	return json.Marshal(txs)
+}
+
+func (txs Transactions) Deserialize(d []byte) error {
+	return json.Unmarshal(d, &txs)
+}
+
 // TxMeta represents the meta data of a transaction,
 // contains the index of transacitons in a certain block
 type TxMeta struct {

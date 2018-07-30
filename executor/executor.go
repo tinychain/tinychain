@@ -165,7 +165,7 @@ func (ex *Executor) processBlock(block *types.Block) error {
 
 	// Send receipts to engine
 	go ex.event.Post(&core.NewReceiptsEvent{
-		Height:   block.Height(),
+		Block:    block,
 		Receipts: receipts,
 	})
 

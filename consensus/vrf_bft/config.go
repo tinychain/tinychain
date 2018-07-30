@@ -6,6 +6,7 @@ import (
 )
 
 type Config struct {
+	BP             bool          // the peer is block producer or not
 	RoundSize      int           // max number of block producers for one round
 	GasLimit       uint64        // Block gas limit
 	PrivKey        []byte        // Private key of block producer
@@ -15,6 +16,7 @@ type Config struct {
 
 func newConfig(config *common.Config) *Config {
 	return &Config{
+		BP:             config.GetBool("consensus.isBP"),
 		GasLimit:       uint64(config.GetInt64("consensus.block_gas_limit")),
 		PrivKey:        []byte(config.GetString("consensus.bp_private_key")),
 		ProcessTimeout: config.GetDuration("consensus.process_timeout"),

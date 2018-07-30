@@ -151,8 +151,8 @@ func (eg *Engine) preCommit(message *msg.ConsensusMsg) error {
 
 	// Check receipts have exist in consensus engine and match the block or not
 	if receipts, ok := eg.receipts.Load(message.SeqNo); ok {
-		if err := eg.checkReceipts(block, receipts.(types.Receipts)); err != nil {
-			log.Errorf("check receipts get error: %s", err)
+		if err := eg.validator.ValidateState(block, eg.state, receipts.(types.Receipts)); err != nil {
+			log.Errorf("invalid block state, err:%s", err)
 			return err
 		}
 	}
@@ -261,15 +261,6 @@ func (eg *Engine) checkPreCommit(block *types.Block, message *msg.ConsensusMsg) 
 		return errSignatureInvalid
 	}
 
-	return nil
-}
-
-// checkReceipts checks the receipts of the block
-func (eg *Engine) checkReceipts(block *types.Block, receipts types.Receipts) error {
-	root := receipts.Hash()
-	if root != block.ReceiptsHash() {
-		return errReceiptNotMatch
-	}
 	return nil
 }
 

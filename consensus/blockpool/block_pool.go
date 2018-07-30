@@ -18,12 +18,17 @@ var (
 	ErrPoolFull       = errors.New("block pool is full")
 )
 
+type BlockValidator interface {
+	ValidateHeader(block *types.Block) error
+}
+
 type BlockPool struct {
 	maxBlockSize uint64
 	mu           sync.RWMutex
 	log          *logging.Logger
 	msgType      string                  // Message type for p2p transfering
 	valid        map[uint64]*types.Block // Valid blocks pool. map[height]*block
+	validator    BlockValidator
 	event        *event.TypeMux
 	quitCh       chan struct{}
 
@@ -32,38 +37,20 @@ type BlockPool struct {
 
 // Create a block pool instance
 // The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
-func NewBlockPool(config *common.Config, log *logging.Logger, msgType string) *BlockPool {
+func NewBlockPool(config *common.Config, validator BlockValidator, log *logging.Logger, msgType string) *BlockPool {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
 	bp := &BlockPool{
 		maxBlockSize: maxBlockSize,
 		event:        event.GetEventhub(),
 		log:          log,
 		msgType:      msgType,
+		validator:    validator,
 		valid:        make(map[uint64]*types.Block, maxBlockSize),
 		quitCh:       make(chan struct{}),
 	}
 
 	return bp
 }
-
-//func (bp *BlockPool) Start() {
-//	bp.blockSub = bp.event.Subscribe(&core.NewBlockEvent{})
-//
-//	go bp.listen()
-//}
-//
-//func (bp *BlockPool) listen() {
-//	for {
-//		select {
-//		case ev := <-bp.blockSub.Chan():
-//			block := ev.(*core.NewBlockEvent).Block
-//			go bp.add(block)
-//		case <-bp.quitCh:
-//			bp.blockSub.Unsubscribe()
-//			return
-//		}
-//	}
-//}
 
 // MsgType returns the msg type used in p2p layer
 func (bp *BlockPool) MsgType() string {
@@ -100,6 +87,10 @@ func (bp *BlockPool) AddBlock(block *types.Block) error {
 func (bp *BlockPool) add(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
+	// Validate block
+	if err := bp.validator.ValidateHeader(block); err != nil {
+		return err
+	}
 	// Check block duplicate
 	old := bp.valid[block.Height()]
 	if old != nil && old.Hash() != block.Hash() {

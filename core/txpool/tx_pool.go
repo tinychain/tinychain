@@ -13,6 +13,7 @@ import (
 	"tinychain/p2p/pb"
 	"github.com/libp2p/go-libp2p-peer"
 	"encoding/json"
+	"tinychain/p2p"
 )
 
 var (
@@ -47,7 +48,7 @@ type TxPool struct {
 	newTxSub event.Subscription // receive tx generated from local
 }
 
-func NewTxPool(config *common.Config, validator TxValidator, state *state.StateDB, useBatch bool) *TxPool {
+func NewTxPool(config *common.Config, validator TxValidator, state *state.StateDB, useBatch bool, onlybroadcast bool) *TxPool {
 	conf := newConfig(config)
 	tp := &TxPool{
 		config:       conf,
@@ -59,13 +60,22 @@ func NewTxPool(config *common.Config, validator TxValidator, state *state.StateD
 	}
 
 	if useBatch {
-		batch := batcher.NewBatch(
-			"NEW_TXS",
-			conf.BatchCapacity,
-			conf.BatchTimeout,
-			tp.launch,
-		)
-
+		var batch *batcher.Batch
+		if !onlybroadcast {
+			batch = batcher.NewBatch(
+				"NEW_TXS",
+				conf.BatchCapacity,
+				conf.BatchTimeout,
+				tp.launch,
+			)
+		} else {
+			batch = batcher.NewBatch(
+				"NEW_TXS",
+				conf.BatchCapacity,
+				conf.BatchTimeout,
+				tp.broadcast,
+			)
+		}
 		tp.batch = batch
 	}
 	return tp
@@ -92,9 +102,22 @@ func (tp *TxPool) Stop() {
 	close(tp.quitCh)
 }
 
+// launch will send ready transactions to consensus engine for proposing new blocks.
 func (tp *TxPool) launch(batch []interface{}) {
 	go tp.event.Post(&core.ExecPendingTxEvent{
 		Txs: tp.Pending(),
+	})
+}
+
+// broadcast only sends transactions to other peers and do not trigger proposing.
+func (tp *TxPool) broadcast(batch []interface{}) {
+	data, err := tp.Pending().Serialize()
+	if err != nil {
+		return
+	}
+	go tp.event.Post(&p2p.BroadcastEvent{
+		Typ:  common.NEW_TX_MSG,
+		Data: data,
 	})
 }
 

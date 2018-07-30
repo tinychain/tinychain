@@ -66,6 +66,6 @@ type TxBroadcastEvent struct{}
 	Receipts events
  */
 type NewReceiptsEvent struct {
-	Height   uint64
+	Block    *types.Block
 	Receipts types.Receipts
 }
