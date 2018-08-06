@@ -41,7 +41,7 @@ func newHost(port int, privKey crypto.PrivKey) (*bhost.BasicHost, error) {
 	if privKey == nil {
 		var err error
 		//priv, pub, err := crypto.GenerateKeyPair(crypto.RSA, 2048)
-		priv, pub, err = crypto.GenerateSecp256k1Key(rand.Reader)
+		priv, pub, err = crypto.GenerateEd25519Key(rand.Reader)
 		if err != nil {
 			log.Error(err)
 			return nil, err
