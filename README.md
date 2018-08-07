@@ -5,7 +5,7 @@ This project is working in progress. A tiny blockchain
 ### Consensus
 In consensus module, we design and implements different consensus algorithm, and make them **pluggable**.
  
-please read [document](docs/consensus_zh.md)
+please read [document](docs/consensus.md)
 
 ### Network
 We use libp2p to implements network layer, including:
@@ -38,7 +38,7 @@ In tinychain, we use **Bucket tree** to induce transactions and world state.
 Bucket tree is a variant merkle tree with several features that are different from the common merkle tree:
 
 1. fix height of tree when initialize and will not be changed by the amount of transactions at leaf nodes.
-2. low-cost to recompute the root hash when add or remove a new kv pair to/from tree.
+2. low-cost to recompute the root hash when add or remove a kv pair to/from tree.
 3. customizable capacity and aggreation.
 
 ### Event Hub

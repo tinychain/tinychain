@@ -89,7 +89,7 @@ func (eg *Engine) fetchBlockLoop(seqNo uint64) (*types.Block, error) {
 }
 
 // startBFT kicks off the bft process
-// 1. retrived from block_pool (block have been validated), and multicast PRE_COMMIT
+// 1. retrived from block_pool, and multicast PRE_COMMIT
 func (eg *Engine) startBFT() error {
 	block, err := eg.fetchBlockLoop(eg.SeqNo())
 	if err != nil {

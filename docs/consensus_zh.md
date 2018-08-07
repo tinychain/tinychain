@@ -20,3 +20,38 @@ Solo采用惰性出块的方式。当出块节点的交易池`tx_pool`接收到�
 VRF(Verifiable Random Function)
 
 WIP
+
+
+# 可插拔设计
+共识引擎与其他模块通过消息机制进行通信。
+
+## 区块池(Block Pool)
+区块池用于收集网络中的新区块，并验证区块头是否合法。若合法，则将该新区块加入到池中供共识引擎获取。
+
+由于**区块池已预先做了区块头验证**，因此共识流程不再需要验证区块头。
+
+## 订阅的事件类型
+为了说明更清楚，故事件类型按出块与非出块节点进行区分。但在某些共识机制下，一个节点既可能是出块节点，也可能是非出块节点，所以**建议对以下所有事件类型均做监听并实现响应的处理逻辑**。
+### 出块节点
+- `core.ConsensusEvent` - `Executor`完成对新提案区块的执行和封装，通知订阅者。
+- `core.ExecPendingTxEvent` - `tx_pool`收集到足够的交易后，通知订阅者。
+
+### 非出块节点
+- `core.BlockReadyEvent` - `block_pool`接收到新的新区块到达，则通知订阅者。
+- `core.NewReceiptsEvent` - `Executor`执行区块后，发送新的交易回执`receipts`，通知订阅者。
+
+### 所有类型节点
+- `core.CommitCompleteEvent` - `Exector`成功提交区块至数据库后，通知订阅者。
+
+## 对外发送的事件类型
+### 出块节点
+- `core.ProposeBlockEvent` - 共识引擎提案了新的区块。该事件由`Executor`监听，封装成完成区块。
+- `core.CommitBlockEvent` - 通知`Executor`提交区块至数据库。
+- `p2p.MulticastEvent` - 通知网络层组播新区块。
+
+### 非出块节点
+- `core.ExecBlockEvent` - 通知`Executor`执行区块，并获取回执（通过`core.NewReceiptsEvent`)
+- `p2p.BroadcastEvent` - 通知网络层广播区块。
+
+### 所有类型节点
+- `core.CommitBlockEvent` - 通知`Executor`提交区块至数据库。

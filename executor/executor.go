@@ -34,9 +34,8 @@ type Blockchain interface {
 type Executor struct {
 	db        *db.TinyDB
 	processor Processor
-	chain     Blockchain     // Blockchain wrapper
-	validator BlockValidator // Block validator
-	batch     batcher.Batch  // Batch for creating new block
+	chain     Blockchain    // Blockchain wrapper
+	batch     batcher.Batch // Batch for creating new block
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
@@ -57,7 +56,6 @@ func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *
 		db:        db,
 		processor: processor,
 		chain:     chain,
-		validator: NewBlockValidator(chain),
 		engine:    engine,
 		event:     event.GetEventhub(),
 		quitCh:    make(chan struct{}),
@@ -139,19 +137,10 @@ func (ex *Executor) processBlock(block *types.Block) error {
 	if block.Height() < ex.chain.LastBlock().Height() {
 		return ErrBlockFallbehind
 	}
-	if err := ex.validator.ValidateHeader(block); err != nil {
-		log.Errorf("failed to validate block #%d header, err:%s", block.Height(), err)
-		return err
-	}
 
 	receipts, err := ex.execBlock(block)
 	if err != nil {
 		log.Errorf("failed to execute block #%d, err:%s", block.Height(), err)
-		return err
-	}
-
-	if err := ex.validator.ValidateState(block, receipts); err != nil {
-		log.Errorf("failed to validate block #%d body, err:%s", block.Height(), err)
 		return err
 	}
 

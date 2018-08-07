@@ -58,7 +58,7 @@ func (p *Peer) listen() {
 			msg := ev.(*p2p.SendMsgEvent)
 			go p.network.Send(msg.Target, msg.Typ, msg.Data)
 		case ev := <-p.multiSendSub.Chan():
-			msg := ev.(*p2p.MultiSendEvent)
+			msg := ev.(*p2p.MulticastEvent)
 			go p.network.Multicast(msg.Targets, msg.Typ, msg.Data)
 		case p.quitCh:
 			p.sendSub.Unsubscribe()

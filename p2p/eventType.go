@@ -16,8 +16,8 @@ type SendMsgEvent struct {
 	Data   []byte  // Message data
 }
 
-// Multisend msg with p2p network layer
-type MultiSendEvent struct {
+// Multicast msg with p2p network layer
+type MulticastEvent struct {
 	Targets []peer.ID
 	Typ     string
 	Data    []byte

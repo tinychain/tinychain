@@ -155,14 +155,14 @@ func (eg *Engine) listen() {
 		case ev := <-eg.newBlockSub.Chan():
 			block := ev.(*core.BlockReadyEvent).Block
 			if eg.config.BP {
-				go eg.multicastBlock(block)
+				go eg.multicast(block)
 			} else {
 				go eg.broadcast(block)
 			}
 		case ev := <-eg.consensusSub.Chan():
 			block := ev.(*core.ConsensusEvent).Block
 			eg.blockPool.AddBlock(block)
-			eg.multicastBlock(block)
+			eg.multicast(block)
 		case ev := <-eg.receiptsSub.Chan():
 			rev := ev.(*core.NewReceiptsEvent)
 			eg.setReceipts(rev.Block.Height(), rev.Receipts)
@@ -256,7 +256,7 @@ func (eg *Engine) process() {
 }
 
 // multicastBlock send the new proposed block to other BPs
-func (eg *Engine) multicastBlock(block *types.Block) error {
+func (eg *Engine) multicast(block *types.Block) error {
 	var pids []peer.ID
 	for _, bp := range eg.bpPool.getBPs() {
 		pids = append(pids, bp.id)
@@ -265,7 +265,7 @@ func (eg *Engine) multicastBlock(block *types.Block) error {
 	if err != nil {
 		return err
 	}
-	go eg.event.Post(&p2p.MultiSendEvent{
+	go eg.event.Post(&p2p.MulticastEvent{
 		Targets: pids,
 		Typ:     common.PROPOSE_BLOCK_MSG,
 		Data:    data,

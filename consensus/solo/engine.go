@@ -20,8 +20,8 @@ var (
 )
 
 const (
-	BP  = iota
-	NBP
+	BP  = iota // block producer
+	NBP        // not block producer
 )
 
 type Blockchain interface {
@@ -51,7 +51,7 @@ type SoloEngine struct {
 
 	newBlockSub  event.Subscription // listen for the new block from block pool
 	newTxsSub    event.Subscription // listen for the new pending transactions from txpool
-	consensusSub event.Subscription // listen for the new proposed block after executing
+	consensusSub event.Subscription // listen for the new proposed block from executor
 	receiptsSub  event.Subscription // listen for the receipts after executing
 	commitSub    event.Subscription // listen for the commit block completed from executor
 }
@@ -73,9 +73,10 @@ func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain
 		if err != nil {
 			return nil, err
 		}
-
+		soloEngine.typ.Store(BP)
 		soloEngine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, false)
 	} else {
+		soloEngine.typ.Store(NBP)
 		soloEngine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, true)
 	}
 	return soloEngine, nil
@@ -109,7 +110,10 @@ func (solo *SoloEngine) listen() {
 			block := ev.(*core.CommitCompleteEvent).Block
 			solo.processLock <- struct{}{}
 			go solo.broadcast(block)
-			go solo.process() // call next process
+			// if this peer is a NBP
+			if solo.Type() == NBP {
+				go solo.process() // call next process
+			}
 		case ev := <-solo.consensusSub.Chan():
 			// this channel will be passed when executor completes to propose block,
 			// and always done by bp
@@ -135,6 +139,13 @@ func (solo *SoloEngine) Stop() error {
 	solo.quitCh <- struct{}{}
 	solo.txPool.Stop()
 	return nil
+}
+
+func (solo *SoloEngine) Type() int {
+	if val := solo.typ.Load(); val != nil {
+		return val.(int)
+	}
+	return NBP
 }
 
 func (solo *SoloEngine) Address() common.Address {
