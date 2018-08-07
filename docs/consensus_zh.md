@@ -44,6 +44,10 @@ WIP
 - `core.CommitCompleteEvent` - `Exector`成功提交区块至数据库后，通知订阅者。
 
 ## 对外发送的事件类型
+共识流程中难免需要使用其他模块对共识信息进行处理，如将区块交由`Executor`执行，或通知网络层发送消息等。
+
+以下是共识引擎需要发送（包含但不限于）的一些消息类型——
+
 ### 出块节点
 - `core.ProposeBlockEvent` - 共识引擎提案了新的区块。该事件由`Executor`监听，封装成完成区块。
 - `core.CommitBlockEvent` - 通知`Executor`提交区块至数据库。

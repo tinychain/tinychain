@@ -42,6 +42,10 @@ For clearer description, we classify events into those which peers that produce 
 - `core.CommitCompleteEvent` - `Exector` complete to commit blocks to database，and notify subscriber。
 
 ## Post Event Type
+In consensus process, consensus engine need to use other modules to process the info, such as executing blocks by `Executor`, or notifying network to transfer info, etc.
+
+Some event types used by consensus engine are introduced below(can be more):
+
 ### BP
 - `core.ProposeBlockEvent` - `Consensus` proposes new blocks, and posts it to `Executor` to execute and finalize blocks.
 - `core.CommitBlockEvent` - notify `Executor` to commit blocks to database.
