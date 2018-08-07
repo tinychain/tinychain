@@ -1,5 +1,5 @@
 # Design
-In tinychain, consensus module is design as **pluggable pattern**. Developers can change consensus algorithm to meet different scene easily。
+In tinychain, consensus module is designed as **pluggable pattern**. Developers can change consensus algorithm to meet different scene easily。
 
 We provided several consensus algorithm in advance:
 
@@ -43,7 +43,7 @@ For clearer description, we classify events into those which peers that produce 
 
 ## Post Event Type
 ### BP
-- `core.ProposeBlockEvent` - consensus engine propose new blocks, and post it to `Executor` to execute and finalize blocks.
+- `core.ProposeBlockEvent` - `Consensus` proposes new blocks, and posts it to `Executor` to execute and finalize blocks.
 - `core.CommitBlockEvent` - notify `Executor` to commit blocks to database.
 - `p2p.MulticastEvent` - notify network to multicast new blocks.
 
