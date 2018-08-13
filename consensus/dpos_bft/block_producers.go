@@ -1,4 +1,4 @@
-package vrf_bft
+package dpos_bft
 
 import (
 	"tinychain/common"

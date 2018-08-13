@@ -7,7 +7,7 @@ import (
 	"tinychain/core"
 	"github.com/libp2p/go-libp2p-peer"
 	"tinychain/p2p"
-	"tinychain/consensus/vrf_bft"
+	"tinychain/consensus/dpos_bft"
 )
 
 type BlockPool interface {
@@ -38,6 +38,6 @@ type TxPool interface {
 	Pending() map[common.Address]types.Transactions
 }
 
-func New(config *common.Config, state *state.StateDB, chain *core.Blockchain, id peer.ID) (Engine, error) {
-	return vrf_bft.New(config, state, chain, id)
+func New(config *common.Config, state *state.StateDB, chain *core.Blockchain, id peer.ID, validator BlockValidator) (Engine, error) {
+	return dpos_bft.New(config, state, chain, id, validator)
 }

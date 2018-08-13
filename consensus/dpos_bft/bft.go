@@ -1,8 +1,8 @@
-package vrf_bft
+package dpos_bft
 
 import (
 	"tinychain/p2p/pb"
-	msg "tinychain/consensus/vrf_bft/message"
+	msg "tinychain/consensus/dpos_bft/message"
 	"github.com/golang/protobuf/proto"
 	"errors"
 	"github.com/libp2p/go-libp2p-peer"
@@ -45,7 +45,7 @@ func (eg *Engine) Run(pid peer.ID, message *pb.Message) error {
 
 	var found bool
 	// Check peer.ID is in BP set or not
-	for _, bp := range eg.bpPool.getBPs() {
+	for _, bp := range eg.peerPool.getBPs() {
 		if bp.id == pid {
 			found = true
 			break
@@ -220,7 +220,7 @@ func (eg *Engine) commit(message *msg.ConsensusMsg) error {
 
 func (eg *Engine) multicastConsensus(message *msg.ConsensusMsg) error {
 	var pids []peer.ID
-	for _, bp := range eg.bpPool.getBPs() {
+	for _, bp := range eg.peerPool.getBPs() {
 		pids = append(pids, bp.id)
 	}
 
@@ -229,7 +229,7 @@ func (eg *Engine) multicastConsensus(message *msg.ConsensusMsg) error {
 		log.Errorf("failed to encode consensus msg, err:%s", err)
 		return err
 	}
-	go eg.event.Post(&p2p.MultiSendEvent{
+	go eg.event.Post(&p2p.MulticastEvent{
 		Targets: pids,
 		Typ:     eg.Type(),
 		Data:    data,
