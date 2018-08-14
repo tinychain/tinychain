@@ -33,6 +33,7 @@ func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 	if txRoot != block.TxRoot() {
 		return ErrTxRootNotEqual
 	}
+	return nil
 }
 
 // Validate block txs

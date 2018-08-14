@@ -25,6 +25,7 @@ type ExecFinishEvent struct {
 	Res bool // exec result.If success,set true
 }
 
+// BlockReadyEvent will be post after block pool received a block and store into pool.
 type BlockReadyEvent struct {
 	Block *types.Block
 }

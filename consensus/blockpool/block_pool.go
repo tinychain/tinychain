@@ -11,41 +11,52 @@ import (
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/op/go-logging"
 	"encoding/json"
+	"sync/atomic"
 )
 
 var (
-	ErrBlockDuplicate = errors.New("block duplicate")
-	ErrPoolFull       = errors.New("block pool is full")
+	ErrBlockDuplicate  = errors.New("block duplicate")
+	ErrPoolFull        = errors.New("block pool is full")
+	ErrBlockFallBehind = errors.New("invalid block: block height falls behind the currnet chain")
 )
 
 type BlockValidator interface {
 	ValidateHeader(block *types.Block) error
 }
 
+// ConsensusValidator validates the consensus info field in block header
+type ConsensusValidator interface {
+	Validate(block *types.Block) error
+}
+
 type BlockPool struct {
 	maxBlockSize uint64
 	mu           sync.RWMutex
 	log          *logging.Logger
-	msgType      string                  // Message type for p2p transfering
-	valid        map[uint64]*types.Block // Valid blocks pool. map[height]*block
-	validator    BlockValidator
-	event        *event.TypeMux
-	quitCh       chan struct{}
+	msgType      string                    // Message type for p2p transfering
+	valid        map[uint64][]*types.Block // Valid blocks pool. map[height]*block
+	blValidator  BlockValidator
+	csValidator  ConsensusValidator
+	chainHeight  atomic.Value
+
+	event  *event.TypeMux
+	quitCh chan struct{}
 
 	blockSub event.Subscription // Subscribe new block received from p2p
 }
 
 // Create a block pool instance
 // The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
-func NewBlockPool(config *common.Config, validator BlockValidator, log *logging.Logger, msgType string) *BlockPool {
+func NewBlockPool(config *common.Config, blValidator BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPool {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
 	bp := &BlockPool{
 		maxBlockSize: maxBlockSize,
 		event:        event.GetEventhub(),
 		log:          log,
 		msgType:      msgType,
-		validator:    validator,
-		valid:        make(map[uint64]*types.Block, maxBlockSize),
+		blValidator:  blValidator,
+		csValidator:  csValidator,
+		valid:        make(map[uint64][]*types.Block, maxBlockSize),
 		quitCh:       make(chan struct{}),
 	}
 
@@ -57,59 +68,81 @@ func (bp *BlockPool) MsgType() string {
 	return bp.msgType
 }
 
-func (bp *BlockPool) Valid() []*types.Block {
-	var blocks []*types.Block
-	bp.mu.RLock()
-	defer bp.mu.RUnlock()
-	for _, block := range bp.valid {
-		blocks = append(blocks, block)
-	}
-	return blocks
-}
-
 func (bp *BlockPool) GetBlock(height uint64) *types.Block {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
-	return bp.valid[height]
+	return bp.valid[height][0]
+}
+
+func (bp *BlockPool) isExist(block *types.Block) bool {
+	bp.mu.RLock()
+	defer bp.mu.RUnlock()
+	blks := bp.valid[block.Height()]
+	for _, blk := range blks {
+		if blk.Hash() == block.Hash() {
+			return true
+		}
+	}
+	return false
 }
 
 // AddBlocks add a new block to pool without validating and processing it
 func (bp *BlockPool) AddBlock(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
-	if old := bp.valid[block.Height()]; old != nil && old.Hash() != block.Hash() {
+	if bp.isExist(block) {
 		return ErrBlockDuplicate
 	}
-	bp.valid[block.Height()] = block
+	bp.append(block)
 	return nil
 }
 
 func (bp *BlockPool) add(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
+	if block.Height() <= bp.ChainHeight() {
+		return ErrBlockFallBehind
+	}
+
 	// Validate block
-	if err := bp.validator.ValidateHeader(block); err != nil {
+	if err := bp.blValidator.ValidateHeader(block); err != nil {
 		return err
 	}
+	if bp.csValidator != nil {
+		if err := bp.csValidator.Validate(block); err != nil {
+			return err
+		}
+	}
 	// Check block duplicate
-	old := bp.valid[block.Height()]
-	if old != nil && old.Hash() != block.Hash() {
+	if bp.isExist(block) {
 		return ErrBlockDuplicate
 	}
-	if bp.Size() >= bp.maxBlockSize && old == nil {
+	if bp.Size() >= bp.maxBlockSize {
 		return ErrPoolFull
 	}
 
-	bp.valid[block.Height()] = block
+	bp.append(block)
 	go bp.event.Post(&core.BlockReadyEvent{block})
 	return nil
 }
 
+// append push a new block to the given slot.
+// This func requires the caller to hold write-lock.
+func (bp *BlockPool) append(block *types.Block) {
+	bp.valid[block.Height()] = append(bp.valid[block.Height()], block)
+}
+
 // DelBlock removes the block with given height.
-func (bp *BlockPool) DelBlock(height uint64) {
+func (bp *BlockPool) DelBlock(block *types.Block) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
-	delete(bp.valid, height)
+	blks := bp.valid[block.Height()]
+	for i, blk := range blks {
+		if blk.Hash() == block.Hash() {
+			blks = append(blks[0:i], blks[i+1:]...)
+		}
+	}
+	bp.valid[block.Height()] = blks
 }
 
 // ClearByHeight removes the block whose height is lower than the given height
@@ -121,6 +154,18 @@ func (bp *BlockPool) Clear(height uint64) {
 			delete(bp.valid, h)
 		}
 	}
+}
+
+func (bp *BlockPool) ChainHeight() uint64 {
+	if h := bp.chainHeight.Load(); h != nil {
+		return h.(uint64)
+	}
+	return 0
+}
+
+func (bp *BlockPool) UpdateChainHeight(height uint64) {
+	bp.chainHeight.Store(height)
+	bp.Clear(height)
 }
 
 // Size gets the size of valid blocks.

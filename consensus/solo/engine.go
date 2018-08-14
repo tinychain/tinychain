@@ -20,8 +20,9 @@ var (
 )
 
 const (
-	BP  = iota // block producer
-	NBP        // not block producer
+	BP               = iota  // block producer
+	NBP                      // not block producer
+	REMOVE_THRESHOLD = 65535 // height threshold of clearing block pool
 )
 
 type Blockchain interface {
@@ -61,7 +62,8 @@ func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain
 	soloEngine := &SoloEngine{
 		config:    conf,
 		event:     event.GetEventhub(),
-		blockPool: blockpool.NewBlockPool(config, validator, log, common.PROPOSE_BLOCK_MSG),
+		chain:     chain,
+		blockPool: blockpool.NewBlockPool(config, validator, nil, log, common.PROPOSE_BLOCK_MSG),
 	}
 	if conf.BP {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
@@ -108,6 +110,8 @@ func (solo *SoloEngine) listen() {
 			go solo.process()
 		case ev := <-solo.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
+			solo.blockPool.UpdateChainHeight(solo.chain.LastBlock().Height())
+
 			solo.processLock <- struct{}{}
 			go solo.broadcast(block)
 			// if this peer is a NBP

@@ -46,16 +46,17 @@ func (n BNonce) SetBytes(b []byte) {
 }
 
 type Header struct {
-	ParentHash   common.Hash    `json:"parent_hash"`  // Hash of parent block
-	Height       uint64         `json:"height"`       // Block height
-	StateRoot    common.Hash    `json:"state_root"`   // State root
-	TxRoot       common.Hash    `json:"tx_root"`      // Transaction tree root
-	ReceiptsHash common.Hash    `json:"receipt_hash"` // Receipts hash
-	Coinbase     common.Address `json:"miner"`        // Miner address who receives reward of this block
-	Extra        []byte         `json:"extra"`        // Extra data
-	Time         *big.Int       `json:"time"`         // Timestamp
-	GasUsed      uint64         `json:"gas"`          // Total gas used
-	GasLimit     uint64         `json:"gas_limit"`    // Gas limit of this block
+	ParentHash    common.Hash    `json:"parent_hash"`              // Hash of parent block
+	Height        uint64         `json:"height"`                   // Block height
+	StateRoot     common.Hash    `json:"state_root"`               // State root
+	TxRoot        common.Hash    `json:"tx_root"`                  // Transaction tree root
+	ReceiptsHash  common.Hash    `json:"receipt_hash"`             // Receipts hash
+	Coinbase      common.Address `json:"miner"`                    // Miner address who receives reward of this block
+	Time          *big.Int       `json:"time"`                     // Timestamp
+	GasUsed       uint64         `json:"gas"`                      // Total gas used
+	GasLimit      uint64         `json:"gas_limit"`                // Gas limit of this block
+	Extra         []byte         `json:"extra,omitempty"`          // Extra data
+	ConsensusInfo []byte         `json:"consensus_info,omitempty"` // Extra consensus information
 }
 
 func (hd *Header) Hash() common.Hash {
@@ -95,6 +96,7 @@ func (bl *Block) Extra() []byte             { return bl.Header.Extra }
 func (bl *Block) Time() *big.Int            { return bl.Header.Time }
 func (bl *Block) GasUsed() uint64           { return bl.Header.GasUsed }
 func (bl *Block) GasLimit() uint64          { return bl.Header.GasLimit }
+func (bl *Block) ConsensusInfo() []byte     { return bl.Header.ConsensusInfo }
 
 // Calculate hash of block
 // Combine header hash and transactions hash, and sha256 it
@@ -131,6 +133,27 @@ func (bl *Block) Sign(priv crypto.PrivKey) ([]byte, error) {
 	}
 	bl.Signature = s
 	return s, nil
+}
+
+func (bl *Block) Clone() *Block {
+	return &Block{
+		Header: &Header{
+			ParentHash:    bl.ParentHash(),
+			Height:        bl.Height(),
+			StateRoot:     bl.StateRoot(),
+			TxRoot:        bl.TxRoot(),
+			ReceiptsHash:  bl.ReceiptsHash(),
+			Coinbase:      bl.Coinbase(),
+			Time:          bl.Time(),
+			GasUsed:       bl.GasUsed(),
+			GasLimit:      bl.GasLimit(),
+			Extra:         bl.Extra(),
+			ConsensusInfo: bl.ConsensusInfo(),
+		},
+		Transactions: bl.Transactions,
+		PubKey:       bl.PubKey,
+		Signature:    bl.Signature,
+	}
 }
 
 func (bl *Block) Serialize() ([]byte, error) { return json.Marshal(bl) }

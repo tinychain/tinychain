@@ -14,7 +14,8 @@ type BlockPool interface {
 	p2p.Protocol
 	GetBlock(height uint64) *types.Block
 	AddBlock(block *types.Block) error
-	DelBlock(height uint64)
+	DelBlock(block *types.Block)
+	UpdateChainHeight(height uint64)
 	Clear(height uint64)
 }
 
