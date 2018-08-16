@@ -8,8 +8,9 @@ import (
 )
 
 const (
-	MAX_GAS_LIMIT  = "max_gas_limit"
-	MAX_BLOCK_SIZE = "max_block_size"
+	MAX_GAS_LIMIT    = "max_gas_limit"
+	MAX_EXTRA_LENGTH = "max_extra_length"
+	MAX_BLOCK_NUM    = "max_block_num"
 )
 
 type Config struct {

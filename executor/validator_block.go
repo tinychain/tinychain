@@ -4,21 +4,27 @@ import (
 	"tinychain/core/types"
 	"errors"
 	"tinychain/core/state"
+	"tinychain/common"
 )
 
 var (
-	ErrTxRootNotEqual      = errors.New("txs root is not equal")
-	ErrReceiptRootNotEqual = errors.New("receipts root is not equal")
-	ErrStateRootNotEqual   = errors.New("state root is not equal")
+	errTxRootNotEqual      = errors.New("txs root is not equal")
+	errReceiptRootNotEqual = errors.New("receipts root is not equal")
+	errStateRootNotEqual   = errors.New("state root is not equal")
+	errGasUsedOverflow     = errors.New("gas used is larger than gas limit")
+	errParentHashNotMatch  = errors.New("parent hash is not match")
+	errExtraDataOverflow   = errors.New("extra data is too long")
 )
 
 type BlockValidatorImpl struct {
-	chain Blockchain
+	maxExtraLength uint64
+	chain          Blockchain
 }
 
-func NewBlockValidator(chain Blockchain) *BlockValidatorImpl {
+func NewBlockValidator(config *common.Config, chain Blockchain) *BlockValidatorImpl {
 	return &BlockValidatorImpl{
-		chain: chain,
+		maxExtraLength: uint64(config.GetInt64(common.MAX_EXTRA_LENGTH)),
+		chain:          chain,
 	}
 }
 
@@ -29,9 +35,25 @@ func NewBlockValidator(chain Blockchain) *BlockValidatorImpl {
 // 4. Validate extra data size is within bounds
 // 5. Validate transactions and tx root
 func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
+	//  TODO Check timestamp
+
+
+	if block.GasUsed() > block.GasLimit() {
+		return errGasUsedOverflow
+	}
+
+	last := v.chain.LastBlock().Hash()
+	if last != block.ParentHash() {
+		return errParentHashNotMatch
+	}
+
+	if uint64(len(block.Extra())) > v.maxExtraLength {
+		return errExtraDataOverflow
+	}
+
 	txRoot := block.Transactions.Hash()
 	if txRoot != block.TxRoot() {
-		return ErrTxRootNotEqual
+		return errTxRootNotEqual
 	}
 	return nil
 }
@@ -42,7 +64,7 @@ func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 func (v *BlockValidatorImpl) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error {
 	receiptRoot := receipts.Hash()
 	if receiptRoot != block.ReceiptsHash() {
-		return ErrReceiptRootNotEqual
+		return errReceiptRootNotEqual
 	}
 
 	root, err := state.IntermediateRoot()
@@ -50,7 +72,7 @@ func (v *BlockValidatorImpl) ValidateState(block *types.Block, state *state.Stat
 		return err
 	}
 	if root != block.StateRoot() {
-		return ErrStateRootNotEqual
+		return errStateRootNotEqual
 	}
 	return nil
 }

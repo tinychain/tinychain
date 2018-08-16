@@ -18,7 +18,8 @@ var (
 )
 
 const (
-	cacheSize = 65535
+	blockCacheLimit  = 1024
+	headerCacheLimit = 2048
 )
 
 // Blockchain is the canonical chain given a database with a genesis block
@@ -35,8 +36,8 @@ type Blockchain struct {
 }
 
 func NewBlockchain(db *db.TinyDB, engine consensus.Engine) (*Blockchain, error) {
-	blocksCache, _ := lru.New(cacheSize)
-	headerCache, _ := lru.New(cacheSize)
+	blocksCache, _ := lru.New(blockCacheLimit)
+	headerCache, _ := lru.New(headerCacheLimit)
 	bc := &Blockchain{
 		db:          db,
 		engine:      engine,
@@ -145,9 +146,6 @@ func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {
 }
 
 func (bc *Blockchain) GetBlockByHeight(height uint64) *types.Block {
-	if block, ok := bc.blocksCache.Get(height); ok {
-		return block.(*types.Block)
-	}
 	hash, err := bc.db.GetHash(height)
 	if err != nil {
 		log.Errorf("failed to get hash from db, err:%s", err)
@@ -157,13 +155,13 @@ func (bc *Blockchain) GetBlockByHeight(height uint64) *types.Block {
 }
 
 func (bc *Blockchain) GetBlockByHash(hash common.Hash) *types.Block {
+	if block, ok := bc.blocksCache.Get(hash); ok {
+		return block.(*types.Block)
+	}
 	height, err := bc.db.GetHeight(hash)
 	if err != nil {
 		log.Errorf("failed to get height by hash from db, err:%s", err)
 		return nil
-	}
-	if block, ok := bc.blocksCache.Get(height); ok {
-		return block.(*types.Block)
 	}
 	return bc.GetBlock(hash, height)
 }
@@ -209,7 +207,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 			"block #%d cannot be added into blockchain because its previous block height is #%d",
 			block.Height(), last.Height()))
 	}
-	bc.blocksCache.Add(block.Height(), block)
+	bc.blocksCache.Add(block.Hash(), block)
 	bc.lastBlock.Store(block)
 	return nil
 }

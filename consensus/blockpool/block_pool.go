@@ -14,6 +14,10 @@ import (
 	"sync/atomic"
 )
 
+const (
+	maxBlockGap = uint64(1000)
+)
+
 var (
 	ErrBlockDuplicate  = errors.New("block duplicate")
 	ErrPoolFull        = errors.New("block pool is full")
@@ -33,8 +37,8 @@ type BlockPool struct {
 	maxBlockSize uint64
 	mu           sync.RWMutex
 	log          *logging.Logger
-	msgType      string                    // Message type for p2p transfering
-	valid        map[uint64][]*types.Block // Valid blocks pool. map[height]*block
+	msgType      string                  // Message type for p2p transfering
+	valid        map[uint64]types.Blocks // Valid blocks pool. map[height]*block
 	blValidator  BlockValidator
 	csValidator  ConsensusValidator
 	chainHeight  atomic.Value
@@ -48,7 +52,7 @@ type BlockPool struct {
 // Create a block pool instance
 // The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
 func NewBlockPool(config *common.Config, blValidator BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPool {
-	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_SIZE))
+	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_NUM))
 	bp := &BlockPool{
 		maxBlockSize: maxBlockSize,
 		event:        event.GetEventhub(),
@@ -56,7 +60,7 @@ func NewBlockPool(config *common.Config, blValidator BlockValidator, csValidator
 		msgType:      msgType,
 		blValidator:  blValidator,
 		csValidator:  csValidator,
-		valid:        make(map[uint64][]*types.Block, maxBlockSize),
+		valid:        make(map[uint64]types.Blocks, maxBlockSize),
 		quitCh:       make(chan struct{}),
 	}
 
@@ -72,6 +76,12 @@ func (bp *BlockPool) GetBlock(height uint64) *types.Block {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
 	return bp.valid[height][0]
+}
+
+func (bp *BlockPool) GetBlocks(height uint64) types.Blocks {
+	bp.mu.RLock()
+	defer bp.mu.RUnlock()
+	return bp.valid[height]
 }
 
 func (bp *BlockPool) isExist(block *types.Block) bool {
@@ -118,7 +128,11 @@ func (bp *BlockPool) add(block *types.Block) error {
 		return ErrBlockDuplicate
 	}
 	if bp.Size() >= bp.maxBlockSize {
-		return ErrPoolFull
+		// clear old blocks
+		bp.Clear(bp.ChainHeight() - maxBlockGap)
+		if bp.Size() >= bp.maxBlockSize {
+			return ErrPoolFull
+		}
 	}
 
 	bp.append(block)
@@ -165,7 +179,7 @@ func (bp *BlockPool) ChainHeight() uint64 {
 
 func (bp *BlockPool) UpdateChainHeight(height uint64) {
 	bp.chainHeight.Store(height)
-	bp.Clear(height)
+	//bp.Clear(height)
 }
 
 // Size gets the size of valid blocks.

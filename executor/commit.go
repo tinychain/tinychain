@@ -22,12 +22,12 @@ func (ex *Executor) commit(block *types.Block) error {
 		ex.receiptsCache.Delete(block.Height())
 	}
 
-	if err := ex.commitBlock(block); err != nil {
+	if _, err := ex.stateCommit(block.Height()); err != nil {
+		log.Errorf("failed to put state in batch, err:%s", err)
 		return err
 	}
 
-	if _, err := ex.stateCommit(block.Height()); err != nil {
-		log.Errorf("failed to put state in batch, err:%s", err)
+	if err := ex.commitBlock(block); err != nil {
 		return err
 	}
 
@@ -39,7 +39,6 @@ func (ex *Executor) commit(block *types.Block) error {
 	log.Infof("New block height = #%d commits. Hash = %s", block.Height(), block.Hash().Hex())
 	go ex.event.Post(&core.CommitCompleteEvent{
 		Block: block,
-
 	})
 	return nil
 }

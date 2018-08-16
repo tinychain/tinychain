@@ -10,20 +10,6 @@ import (
 	"tinychain/consensus/dpos_bft"
 )
 
-type BlockPool interface {
-	p2p.Protocol
-	GetBlock(height uint64) *types.Block
-	AddBlock(block *types.Block) error
-	DelBlock(block *types.Block)
-	UpdateChainHeight(height uint64)
-	Clear(height uint64)
-}
-
-type BlockValidator interface {
-	ValidateHeader(block *types.Block) error
-	ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error
-}
-
 type Engine interface {
 	Start() error
 	Stop() error

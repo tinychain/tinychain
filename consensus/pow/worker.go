@@ -3,7 +3,6 @@ package pow
 import (
 	"math/big"
 	"tinychain/core/types"
-	"tinychain/common"
 )
 
 type worker struct {
@@ -15,12 +14,10 @@ type worker struct {
 }
 
 func newWorker(difficulty uint64, minBound uint64, maxBound uint64, block *types.Block) *worker {
-	target := new(big.Int).SetUint64(1)
-	target.Lsh(target, uint(256-difficulty))
 	return &worker{
 		difficulty: difficulty,
 		block:      block,
-		target:     target,
+		target:     computeTarget(difficulty),
 		minBound:   minBound,
 		maxBound:   maxBound,
 	}
@@ -29,7 +26,7 @@ func newWorker(difficulty uint64, minBound uint64, maxBound uint64, block *types
 // Run starts a computing task to find a valid nonce
 func (w *worker) Run(foundChan *nonceChan) {
 	var result big.Int
-	// TODO
+
 	nonce := w.minBound
 	for nonce <= w.maxBound {
 		select {
@@ -37,7 +34,7 @@ func (w *worker) Run(foundChan *nonceChan) {
 			return
 		default:
 		}
-		hash, err := w.computeHash(nonce)
+		hash, err := computeHash(nonce, w.difficulty, w.block)
 		if err != nil {
 			return
 		}
@@ -48,19 +45,4 @@ func (w *worker) Run(foundChan *nonceChan) {
 		nonce++
 	}
 	foundChan.post(nonce)
-}
-
-func (w *worker) computeHash(nonce uint64) ([]byte, error) {
-	consensus := &consensusInfo{
-		Difficulty: w.difficulty,
-		Nonce:      nonce,
-	}
-	data, err := consensus.Serialize()
-	if err != nil {
-		return nil, err
-	}
-	w.block.Header.ConsensusInfo = data
-	first := w.block.Hash()
-	hash := common.Sha256(first.Bytes())
-	return hash.Bytes(), nil
 }

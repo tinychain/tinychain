@@ -2,7 +2,6 @@ package solo
 
 import (
 	"tinychain/core/types"
-	"tinychain/consensus"
 	"tinychain/common"
 	"tinychain/core/state"
 	"github.com/libp2p/go-libp2p-crypto"
@@ -10,9 +9,10 @@ import (
 	"tinychain/event"
 	"tinychain/core"
 	"tinychain/p2p"
-	"sync/atomic"
 	"tinychain/executor"
 	"tinychain/core/txpool"
+	"time"
+	"math/big"
 )
 
 var (
@@ -29,18 +29,12 @@ type Blockchain interface {
 	LastBlock() *types.Block
 }
 
-type TxPool interface {
-	Start()
-	Stop()
-}
-
 type SoloEngine struct {
-	typ       atomic.Value
 	config    *Config
 	chain     Blockchain
-	validator consensus.BlockValidator
-	blockPool consensus.BlockPool
-	txPool    TxPool
+	validator executor.BlockValidator
+	blockPool common.BlockPool
+	txPool    *txpool.TxPool
 	state     *state.StateDB
 	event     *event.TypeMux
 
@@ -52,12 +46,12 @@ type SoloEngine struct {
 
 	newBlockSub  event.Subscription // listen for the new block from block pool
 	newTxsSub    event.Subscription // listen for the new pending transactions from txpool
-	consensusSub event.Subscription // listen for the new proposed block from executor
+	consensusSub event.Subscription // listen for the new proposed block executed by executor
 	receiptsSub  event.Subscription // listen for the receipts after executing
 	commitSub    event.Subscription // listen for the commit block completed from executor
 }
 
-func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain, validator consensus.BlockValidator) (*SoloEngine, error) {
+func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain, validator executor.BlockValidator) (*SoloEngine, error) {
 	conf := newConfig(config)
 	soloEngine := &SoloEngine{
 		config:    conf,
@@ -65,6 +59,8 @@ func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain
 		chain:     chain,
 		blockPool: blockpool.NewBlockPool(config, validator, nil, log, common.PROPOSE_BLOCK_MSG),
 	}
+
+	txValidator := executor.NewTxValidator(executor.NewConfig(config), state)
 	if conf.BP {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
 		if err != nil {
@@ -75,11 +71,9 @@ func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain
 		if err != nil {
 			return nil, err
 		}
-		soloEngine.typ.Store(BP)
-		soloEngine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, false)
+		soloEngine.txPool = txpool.NewTxPool(config, txValidator, state, true, false)
 	} else {
-		soloEngine.typ.Store(NBP)
-		soloEngine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, true)
+		soloEngine.txPool = txpool.NewTxPool(config, txValidator, state, true, true)
 	}
 	return soloEngine, nil
 }
@@ -115,7 +109,7 @@ func (solo *SoloEngine) listen() {
 			solo.processLock <- struct{}{}
 			go solo.broadcast(block)
 			// if this peer is a NBP
-			if solo.Type() == NBP {
+			if !solo.config.BP {
 				go solo.process() // call next process
 			}
 		case ev := <-solo.consensusSub.Chan():
@@ -145,13 +139,6 @@ func (solo *SoloEngine) Stop() error {
 	return nil
 }
 
-func (solo *SoloEngine) Type() int {
-	if val := solo.typ.Load(); val != nil {
-		return val.(int)
-	}
-	return NBP
-}
-
 func (solo *SoloEngine) Address() common.Address {
 	return solo.address
 }
@@ -176,6 +163,8 @@ func (solo *SoloEngine) proposeBlock(txs types.Transactions) {
 		Height:     solo.chain.LastBlock().Height() + 1,
 		Coinbase:   solo.Address(),
 		Extra:      solo.config.Extra,
+		Time:       new(big.Int).SetInt64(time.Now().Unix()),
+		GasLimit:   solo.config.GasLimit,
 	}
 
 	block := types.NewBlock(header, txs)
