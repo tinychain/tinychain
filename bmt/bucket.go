@@ -29,7 +29,7 @@ func (bk *Bucket) Hash() common.Hash {
 }
 
 // Compute hash
-func (bk *Bucket) computHash() common.Hash {
+func (bk *Bucket) computeHash() common.Hash {
 	bk.lock.Lock()
 	defer bk.lock.Unlock()
 	var bytes []byte

@@ -170,7 +170,7 @@ func (bt *BucketTree) processNodes() error {
 			return err
 		}
 		bucket := bt.hashTable.buckets[i]
-		bucket.computHash()
+		bucket.computeHash()
 		leaf.setHash(bucket.Hash())
 
 		// Collect dirty node
