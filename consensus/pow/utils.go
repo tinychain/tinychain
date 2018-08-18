@@ -4,22 +4,15 @@ import (
 	"tinychain/common"
 	"tinychain/core/types"
 	"math/big"
+	"encoding/binary"
 )
 
-func computeHash(difficulty uint64, nonce uint64, block *types.Block) ([]byte, error) {
-	consensus := &consensusInfo{
-		Difficulty: difficulty,
-		Nonce:      nonce,
-	}
-	data, err := consensus.Serialize()
-	if err != nil {
-		return nil, err
-	}
-	clone := block.Clone()
-	clone.Header.ConsensusInfo = data
-	seed := clone.Hash()
-	hash := common.Sha256(seed.Bytes())
-	return hash.Bytes(), nil
+func computeHash(nonce uint64, header *types.Header) ([]byte, error) {
+	var nonceBytes []byte
+	binary.BigEndian.PutUint64(nonceBytes, nonce)
+	hash := header.Hash().Bytes()
+	hash = append(hash, nonceBytes...)
+	return common.Sha256(hash), nil
 }
 
 func computeTarget(difficulty uint64) *big.Int {

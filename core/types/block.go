@@ -8,6 +8,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"github.com/libp2p/go-libp2p-crypto"
+	"bytes"
 )
 
 // BNonce is a 64-bit hash which proves that a sufficient amount of
@@ -60,7 +61,37 @@ type Header struct {
 }
 
 func (hd *Header) Hash() common.Hash {
-	data, _ := json.Marshal(hd)
+	var (
+		data        []byte
+		heightBytes []byte // bytes of height
+		gusedBytes  []byte // bytes of GasUsed
+		glimitBytes []byte // bytes of GasLimit
+	)
+
+	if hd.Height != 0 {
+		binary.BigEndian.PutUint64(heightBytes, hd.Height)
+	}
+	if hd.GasUsed != 0 {
+		binary.BigEndian.PutUint64(gusedBytes, hd.GasUsed)
+	}
+	if hd.GasLimit != 0 {
+		binary.BigEndian.PutUint64(glimitBytes, hd.GasLimit)
+	}
+
+	data = bytes.Join([][]byte{
+		hd.ParentHash.Bytes(),
+		heightBytes,
+		hd.StateRoot.Bytes(),
+		hd.TxRoot.Bytes(),
+		hd.ReceiptsHash.Bytes(),
+		hd.Coinbase.Bytes(),
+		hd.Time.Bytes(),
+		gusedBytes,
+		glimitBytes,
+		hd.Extra,
+		hd.ConsensusInfo,
+	}, nil)
+
 	hash := common.Sha256(data)
 	return hash
 }

@@ -6,17 +6,17 @@ import (
 )
 
 type worker struct {
-	block      *types.Block
+	header     *types.Header
 	difficulty uint64
 	target     *big.Int // the computing hash should be lower than this target
 	minBound   uint64   // computing nonce from
 	maxBound   uint64   // computing nonce to
 }
 
-func newWorker(difficulty uint64, minBound uint64, maxBound uint64, block *types.Block) *worker {
+func newWorker(difficulty uint64, minBound uint64, maxBound uint64, header *types.Header) *worker {
 	return &worker{
 		difficulty: difficulty,
-		block:      block,
+		header:     header,
 		target:     computeTarget(difficulty),
 		minBound:   minBound,
 		maxBound:   maxBound,
@@ -34,7 +34,7 @@ func (w *worker) Run(foundChan *nonceChan) {
 			return
 		default:
 		}
-		hash, err := computeHash(nonce, w.difficulty, w.block)
+		hash, err := computeHash(nonce, w.header)
 		if err != nil {
 			return
 		}

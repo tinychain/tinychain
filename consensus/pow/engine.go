@@ -17,6 +17,8 @@ import (
 	"tinychain/consensus/blockpool"
 	"tinychain/executor"
 	"tinychain/core/txpool"
+	"sync/atomic"
+	"fmt"
 )
 
 var (
@@ -24,8 +26,8 @@ var (
 )
 
 const (
-	DEFAULT_TARGET_BITS = 24 // default mining difficulty
-	MAX_NONCE           = math.MaxUint64
+	maxNonce    = math.MaxUint64
+	minerReward = 998
 )
 
 type Blockchain interface {
@@ -55,13 +57,16 @@ type ProofOfWork struct {
 	txPool      *txpool.TxPool
 	blValidator executor.BlockValidator // block validator
 	csValidator *csValidator            // consensus validator
-	difficulty  uint64                  // difficulty target bits
 
 	address common.Address
 	privKey crypto.PrivKey
 
 	quitCh      chan struct{}
 	processLock chan struct{}
+	mineStopCh  chan struct{}
+
+	// cache
+	currDiff uint64 // current difficulty
 
 	consensusSub event.Subscription // listen for the new proposed block executed by executor
 	newTxsSub    event.Subscription // listen for the new pending transactions from txpool
@@ -74,7 +79,7 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 	// TODO config resolve
 	conf := newConfig(config)
 
-	csValidator := newCsValidator(conf.Difficulty)
+	csValidator := newCsValidator()
 
 	pow := &ProofOfWork{
 		config:      conf,
@@ -88,8 +93,8 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 	}
 
 	txValidator := executor.NewTxValidator(executor.NewConfig(config), state)
-	// if is mining node
-	if conf.Mining {
+	// if is miner node
+	if conf.Miner {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
 		if err != nil {
 			return nil, err
@@ -109,10 +114,14 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 
 func (pow *ProofOfWork) Start() error {
 	pow.consensusSub = pow.event.Subscribe(&core.ConsensusEvent{})
-	pow.newTxsSub = pow.event.Subscribe(&core.ExecPendingTxEvent{})
 	pow.commitSub = pow.event.Subscribe(&core.CommitCompleteEvent{})
 	pow.receiptsSub = pow.event.Subscribe(&core.NewReceiptsEvent{})
 	pow.newBlockSub = pow.event.Subscribe(&core.BlockReadyEvent{})
+
+	go pow.listen()
+	if pow.config.Miner {
+		go pow.mining()
+	}
 	return nil
 }
 
@@ -121,10 +130,7 @@ func (pow *ProofOfWork) listen() {
 		select {
 		case ev := <-pow.consensusSub.Chan():
 			block := ev.(*core.ConsensusEvent).Block
-			go pow.run(block)
-		case ev := <-pow.newTxsSub.Chan():
-			txs := ev.(*core.ExecPendingTxEvent).Txs
-			go pow.proposeBlock(txs)
+			go pow.commit(block)
 		case <-pow.newBlockSub.Chan():
 			go pow.process()
 		case ev := <-pow.receiptsSub.Chan():
@@ -132,17 +138,18 @@ func (pow *ProofOfWork) listen() {
 			go pow.validateAndCommit(rev.Block, rev.Receipts)
 		case ev := <-pow.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
-			pow.blockPool.UpdateChainHeight(pow.chain.LastBlock().Height())
-
-			pow.processLock <- struct{}{}
-			go pow.broadcast(block)
-			if !pow.config.Mining {
-				go pow.process()
-			}
+			go pow.commitComplete(block)
 		case <-pow.quitCh:
 			pow.consensusSub.Unsubscribe()
 			return
 		}
+	}
+}
+
+// mining is invoked by miner node, and will start a new mining work every time it complete the last work
+func (pow *ProofOfWork) mining() {
+	for {
+		pow.proposeBlock(pow.txPool.Pending())
 	}
 }
 
@@ -155,8 +162,22 @@ func (pow *ProofOfWork) Addr() common.Address {
 	return pow.address
 }
 
+func (pow *ProofOfWork) difficulty() (uint64, error) {
+	if diff := atomic.LoadUint64(&pow.currDiff); diff != 0 {
+		return diff, nil
+	}
+	last := pow.chain.LastBlock()
+	consensus := consensusInfo{}
+	err := json.Unmarshal(last.ConsensusInfo(), &consensus)
+	if err != nil {
+		return 0, err
+	}
+	atomic.StoreUint64(&pow.currDiff, consensus.Difficulty)
+	return consensus.Difficulty, nil
+}
+
 // proposeBlock proposes a new pure block
-func (pow *ProofOfWork) proposeBlock(txs types.Transactions) {
+func (pow *ProofOfWork) proposeBlock(txs types.Transactions) error {
 	last := pow.chain.LastBlock()
 	header := &types.Header{
 		ParentHash: last.ParentHash(),
@@ -166,9 +187,16 @@ func (pow *ProofOfWork) proposeBlock(txs types.Transactions) {
 		GasLimit:   pow.config.GasLimit,
 	}
 
+	err := pow.run(header)
+	if err != nil {
+		log.Errorf("failed to mine block %d, err:%s", header.Height, err)
+		return err
+	}
+
 	block := types.NewBlock(header, txs)
 	go pow.event.Post(&core.ProposeBlockEvent{block})
 	log.Infof("Block producer %s propose a new block, height = #%d", pow.Addr(), block.Height())
+	return nil
 }
 
 func (pow *ProofOfWork) process() {
@@ -181,32 +209,44 @@ func (pow *ProofOfWork) process() {
 	}
 }
 
-func (pow *ProofOfWork) run(block *types.Block) {
+// run performs proof-of-work.
+// It will return error if other miner found a block with the same height
+func (pow *ProofOfWork) run(header *types.Header) error {
 	n := runtime.NumCPU()
-	avg := MAX_NONCE / n
+	avg := maxNonce / n
 	foundChan := newNonceChan()
+	newDiff := pow.adjustDiff()
 	for i := 0; i < n; i++ {
-		go newWorker(pow.difficulty, uint64(avg*i), uint64(avg*(i+1)), block.Clone()).Run(foundChan)
+		go newWorker(newDiff, uint64(avg*i), uint64(avg*(i+1)), header).Run(foundChan)
 	}
 
-	nonce := <-foundChan.ch
+	var nonce uint64
+	select {
+	case nonce = <-foundChan.ch:
+	case <-pow.mineStopCh:
+		return fmt.Errorf("stop mining, a block with the same height %d found", header.Height)
+
+	}
 	// close channel and notify other workers to stop mining
 	foundChan.close()
 
 	consensus := &consensusInfo{
-		Difficulty: pow.difficulty,
+		Difficulty: newDiff,
 		Nonce:      nonce,
 	}
 	data, err := consensus.Serialize()
 	if err != nil {
-		log.Errorf("failed to encode consensus info, err:%s", err)
-		return
+		return fmt.Errorf("failed to encode consensus info, err:%s", err)
 	}
-	block.Header.ConsensusInfo = data
-	pow.commit(block)
+	header.ConsensusInfo = data
+	return nil
 }
 
 func (pow *ProofOfWork) Finalize(header *types.Header, state *state.StateDB, txs types.Transactions, receipts types.Receipts) (*types.Block, error) {
+	// reward miner
+	pow.state.AddBalance(header.Coinbase, new(big.Int).SetUint64(minerReward))
+
+	// calculate state root
 	root, err := state.IntermediateRoot()
 	if err != nil {
 		return nil, err
@@ -241,6 +281,17 @@ func (pow *ProofOfWork) validateAndCommit(block *types.Block, receipts types.Rec
 
 func (pow *ProofOfWork) commit(block *types.Block) {
 	go pow.event.Post(&core.CommitBlockEvent{block})
+}
+
+func (pow *ProofOfWork) commitComplete(block *types.Block) {
+	pow.blockPool.UpdateChainHeight(block.Height())
+	pow.txPool.Drop(block.Transactions)
+
+	pow.processLock <- struct{}{}
+	go pow.broadcast(block)
+	if !pow.config.Miner {
+		go pow.process()
+	}
 }
 
 func (pow *ProofOfWork) broadcast(block *types.Block) error {

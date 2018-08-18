@@ -104,14 +104,7 @@ func (solo *SoloEngine) listen() {
 			go solo.process()
 		case ev := <-solo.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
-			solo.blockPool.UpdateChainHeight(solo.chain.LastBlock().Height())
-
-			solo.processLock <- struct{}{}
-			go solo.broadcast(block)
-			// if this peer is a NBP
-			if !solo.config.BP {
-				go solo.process() // call next process
-			}
+			go solo.commitComplete(block)
 		case ev := <-solo.consensusSub.Chan():
 			// this channel will be passed when executor completes to propose block,
 			// and always done by bp
@@ -214,6 +207,18 @@ func (solo *SoloEngine) validateAndCommit(block *types.Block, receipts types.Rec
 
 func (solo *SoloEngine) commit(block *types.Block) {
 	go solo.event.Post(&core.CommitBlockEvent{block})
+}
+
+func (solo *SoloEngine) commitComplete(block *types.Block) {
+	solo.blockPool.UpdateChainHeight(block.Height())
+	solo.txPool.Drop(block.Transactions)
+
+	solo.processLock <- struct{}{}
+	go solo.broadcast(block)
+	// if this peer is a NBP
+	if !solo.config.BP {
+		go solo.process() // call next process
+	}
 }
 
 func (solo *SoloEngine) Protocols() []p2p.Protocol {
