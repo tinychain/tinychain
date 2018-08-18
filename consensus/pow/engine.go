@@ -17,6 +17,7 @@ import (
 	"tinychain/consensus/blockpool"
 	"tinychain/executor"
 	"tinychain/core/txpool"
+	"sync/atomic"
 )
 
 var (
@@ -24,12 +25,14 @@ var (
 )
 
 const (
-	DEFAULT_TARGET_BITS = 24 // default mining difficulty
-	MAX_NONCE           = math.MaxUint64
+	maxNonce              = math.MaxUint64 << 32
+	blockGapForDiffAdjust = 20160
+	maxDiffculty          = math.MaxUint64 << 32
 )
 
 type Blockchain interface {
 	LastBlock() *types.Block
+	GetBlockByHeight(height uint64) *types.Block
 }
 
 type consensusInfo struct {
@@ -56,6 +59,7 @@ type ProofOfWork struct {
 	blValidator executor.BlockValidator // block validator
 	csValidator *csValidator            // consensus validator
 	difficulty  uint64                  // difficulty target bits
+	blockNum    uint64                  // new block num at certain difficulty period
 
 	address common.Address
 	privKey crypto.PrivKey
@@ -133,7 +137,9 @@ func (pow *ProofOfWork) listen() {
 		case ev := <-pow.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
 			pow.blockPool.UpdateChainHeight(pow.chain.LastBlock().Height())
-
+			// block num add 1
+			atomic.AddUint64(&pow.blockNum, 1)
+			pow.adjustDiff()
 			pow.processLock <- struct{}{}
 			go pow.broadcast(block)
 			if !pow.config.Mining {
@@ -181,9 +187,10 @@ func (pow *ProofOfWork) process() {
 	}
 }
 
+// run performs proof-of-work processing to add consensus info to blocks
 func (pow *ProofOfWork) run(block *types.Block) {
 	n := runtime.NumCPU()
-	avg := MAX_NONCE / n
+	avg := maxNonce / n
 	foundChan := newNonceChan()
 	for i := 0; i < n; i++ {
 		go newWorker(pow.difficulty, uint64(avg*i), uint64(avg*(i+1)), block.Clone()).Run(foundChan)
@@ -258,6 +265,39 @@ func (pow *ProofOfWork) broadcast(block *types.Block) error {
 
 func (pow *ProofOfWork) Protocols() []p2p.Protocol {
 	return nil
+}
+
+// adjustDiff adjust difficulty of mining blocks
+func (pow *ProofOfWork) adjustDiff() {
+	curr := pow.chain.LastBlock()
+	bnum := atomic.LoadUint64(&pow.blockNum)
+	if bnum < 20160 {
+		return
+	}
+	old := pow.chain.GetBlockByHeight(bnum)
+	duration := time.Duration(new(big.Int).Sub(curr.Time(), old.Time()).Int64()).Nanoseconds()
+	week := 7 * 24 * time.Hour
+	if duration < week.Nanoseconds()/4 {
+		// if duration is lower than 1/4 week time, set to 1/4 week time
+		duration = week.Nanoseconds() / 4
+	} else if duration > week.Nanoseconds()*4 {
+		// if duration is larger than 4 times of a week time, set to 4. week time.
+		duration = week.Nanoseconds() * 4
+	}
+	oldTarget := computeTarget(pow.difficulty)
+	newTarget := new(big.Int).Mul(oldTarget, new(big.Int).SetUint64(uint64(duration)))
+	maxTarget := new(big.Int).SetUint64(math.MaxUint64)
+	// if larger than max target
+	if newTarget.Cmp(maxTarget) == 1 {
+		newTarget = maxTarget
+	}
+
+	newDiff := maxTarget.Div(maxTarget, newTarget)
+	maxDiff := new(big.Int).SetUint64(maxDiffculty)
+	if newDiff.Cmp(maxDiff) == 1 {
+		newDiff = maxDiff
+	}
+	pow.difficulty = newDiff.Uint64()
 }
 
 type nonceChan struct {

@@ -4,6 +4,7 @@ import (
 	"tinychain/common"
 	"tinychain/core/types"
 	"math/big"
+	"github.com/ethereum/go-ethereum/common/math"
 )
 
 func computeHash(difficulty uint64, nonce uint64, block *types.Block) ([]byte, error) {
@@ -23,6 +24,6 @@ func computeHash(difficulty uint64, nonce uint64, block *types.Block) ([]byte, e
 }
 
 func computeTarget(difficulty uint64) *big.Int {
-	target := new(big.Int).SetUint64(1)
-	return target.Lsh(target, uint(256-difficulty))
+	maxTarget := new(big.Int).SetUint64(math.MaxUint64)
+	return maxTarget.Div(maxTarget, new(big.Int).SetUint64(difficulty))
 }
