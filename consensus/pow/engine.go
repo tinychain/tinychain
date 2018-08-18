@@ -18,6 +18,7 @@ import (
 	"tinychain/executor"
 	"tinychain/core/txpool"
 	"sync/atomic"
+	"fmt"
 )
 
 var (
@@ -25,14 +26,16 @@ var (
 )
 
 const (
-	maxNonce              = math.MaxUint64 << 32
+	maxNonce              = math.MaxUint64 << 5
 	blockGapForDiffAdjust = 20160
-	maxDiffculty          = math.MaxUint64 << 32
+	maxDiffculty          = math.MaxUint64 << 5
+	minerReward           = 998
 )
 
 type Blockchain interface {
 	LastBlock() *types.Block
 	GetBlockByHeight(height uint64) *types.Block
+	GetBlockByHash(hash common.Hash) *types.Block
 }
 
 type consensusInfo struct {
@@ -44,28 +47,28 @@ func (ci *consensusInfo) Serialize() ([]byte, error) {
 	return json.Marshal(ci)
 }
 
-func (ci *consensusInfo) Deserialize(d []byte) error {
-	return json.Unmarshal(d, ci)
-}
-
 // ProofOfWork implements proof-of-work consensus algorithm.
 type ProofOfWork struct {
-	config      *Config
-	event       *event.TypeMux
-	chain       Blockchain
-	state       *state.StateDB
-	blockPool   common.BlockPool
-	txPool      *txpool.TxPool
-	blValidator executor.BlockValidator // block validator
-	csValidator *csValidator            // consensus validator
-	difficulty  uint64                  // difficulty target bits
-	blockNum    uint64                  // new block num at certain difficulty period
+	config           *Config
+	event            *event.TypeMux
+	chain            Blockchain
+	state            *state.StateDB
+	blockPool        common.BlockPool
+	txPool           *txpool.TxPool
+	blValidator      executor.BlockValidator // block validator
+	csValidator      *csValidator            // consensus validator
+	blockNum         uint64                  // new block num at certain difficulty period
+	currMiningHeader *types.Header           // block header that being mined currently
 
 	address common.Address
 	privKey crypto.PrivKey
 
 	quitCh      chan struct{}
 	processLock chan struct{}
+	mineStopCh  chan struct{} // listen for outer event to make miner stop
+
+	// cache
+	currDiff uint64 // current difficulty
 
 	consensusSub event.Subscription // listen for the new proposed block executed by executor
 	newTxsSub    event.Subscription // listen for the new pending transactions from txpool
@@ -78,7 +81,7 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 	// TODO config resolve
 	conf := newConfig(config)
 
-	csValidator := newCsValidator(conf.Difficulty)
+	csValidator := newCsValidator(chain)
 
 	pow := &ProofOfWork{
 		config:      conf,
@@ -92,8 +95,8 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 	}
 
 	txValidator := executor.NewTxValidator(executor.NewConfig(config), state)
-	// if is mining node
-	if conf.Mining {
+	// if is miner node
+	if conf.Miner {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
 		if err != nil {
 			return nil, err
@@ -113,10 +116,11 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 
 func (pow *ProofOfWork) Start() error {
 	pow.consensusSub = pow.event.Subscribe(&core.ConsensusEvent{})
-	pow.newTxsSub = pow.event.Subscribe(&core.ExecPendingTxEvent{})
 	pow.commitSub = pow.event.Subscribe(&core.CommitCompleteEvent{})
 	pow.receiptsSub = pow.event.Subscribe(&core.NewReceiptsEvent{})
 	pow.newBlockSub = pow.event.Subscribe(&core.BlockReadyEvent{})
+
+	go pow.listen()
 	return nil
 }
 
@@ -126,9 +130,6 @@ func (pow *ProofOfWork) listen() {
 		case ev := <-pow.consensusSub.Chan():
 			block := ev.(*core.ConsensusEvent).Block
 			go pow.run(block)
-		case ev := <-pow.newTxsSub.Chan():
-			txs := ev.(*core.ExecPendingTxEvent).Txs
-			go pow.proposeBlock(txs)
 		case <-pow.newBlockSub.Chan():
 			go pow.process()
 		case ev := <-pow.receiptsSub.Chan():
@@ -136,15 +137,7 @@ func (pow *ProofOfWork) listen() {
 			go pow.validateAndCommit(rev.Block, rev.Receipts)
 		case ev := <-pow.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
-			pow.blockPool.UpdateChainHeight(pow.chain.LastBlock().Height())
-			// block num add 1
-			atomic.AddUint64(&pow.blockNum, 1)
-			pow.adjustDiff()
-			pow.processLock <- struct{}{}
-			go pow.broadcast(block)
-			if !pow.config.Mining {
-				go pow.process()
-			}
+			go pow.commitComplete(block)
 		case <-pow.quitCh:
 			pow.consensusSub.Unsubscribe()
 			return
@@ -161,8 +154,22 @@ func (pow *ProofOfWork) Addr() common.Address {
 	return pow.address
 }
 
+func (pow *ProofOfWork) difficulty() (uint64, error) {
+	if diff := atomic.LoadUint64(&pow.currDiff); diff != 0 {
+		return diff, nil
+	}
+	last := pow.chain.LastBlock()
+	consensus := consensusInfo{}
+	err := json.Unmarshal(last.ConsensusInfo(), &consensus)
+	if err != nil {
+		return 0, err
+	}
+	atomic.StoreUint64(&pow.currDiff, consensus.Difficulty)
+	return consensus.Difficulty, nil
+}
+
 // proposeBlock proposes a new pure block
-func (pow *ProofOfWork) proposeBlock(txs types.Transactions) {
+func (pow *ProofOfWork) proposeBlock() {
 	last := pow.chain.LastBlock()
 	header := &types.Header{
 		ParentHash: last.ParentHash(),
@@ -172,7 +179,7 @@ func (pow *ProofOfWork) proposeBlock(txs types.Transactions) {
 		GasLimit:   pow.config.GasLimit,
 	}
 
-	block := types.NewBlock(header, txs)
+	block := types.NewBlock(header, pow.txPool.Pending())
 	go pow.event.Post(&core.ProposeBlockEvent{block})
 	log.Infof("Block producer %s propose a new block, height = #%d", pow.Addr(), block.Height())
 }
@@ -180,6 +187,9 @@ func (pow *ProofOfWork) proposeBlock(txs types.Transactions) {
 func (pow *ProofOfWork) process() {
 	<-pow.processLock
 	block := pow.blockPool.GetBlock(pow.chain.LastBlock().Height() + 1)
+	if pow.currMiningHeader != nil && pow.currMiningHeader.Height == block.Height() {
+		pow.mineStopCh <- struct{}{}
+	}
 	if block != nil {
 		go pow.event.Post(&core.ExecBlockEvent{block})
 	} else {
@@ -187,33 +197,52 @@ func (pow *ProofOfWork) process() {
 	}
 }
 
-// run performs proof-of-work processing to add consensus info to blocks
-func (pow *ProofOfWork) run(block *types.Block) {
+// run performs proof-of-work.
+// It will return error if other miner found a block with the same height
+func (pow *ProofOfWork) run(block *types.Block) error {
 	n := runtime.NumCPU()
 	avg := maxNonce / n
 	foundChan := newNonceChan()
+	newDiff, err := pow.adjustDiff()
+	if err != nil {
+		return fmt.Errorf("cannot adjust difficulty when start to mine block #%d", block.Height())
+	}
+	pow.currMiningHeader = block.Header
 	for i := 0; i < n; i++ {
-		go newWorker(pow.difficulty, uint64(avg*i), uint64(avg*(i+1)), block.Clone()).Run(foundChan)
+		go newWorker(newDiff, uint64(avg*i), uint64(avg*(i+1)), block.Header).Run(foundChan)
 	}
 
-	nonce := <-foundChan.ch
+	var nonce uint64
+	select {
+	case nonce = <-foundChan.ch:
+	case <-pow.mineStopCh:
+		// close all mining work
+		foundChan.close()
+		return fmt.Errorf("stop mining, a block with the same height #%d found", block.Height())
+
+	}
 	// close channel and notify other workers to stop mining
 	foundChan.close()
 
 	consensus := &consensusInfo{
-		Difficulty: pow.difficulty,
+		Difficulty: newDiff,
 		Nonce:      nonce,
 	}
 	data, err := consensus.Serialize()
 	if err != nil {
-		log.Errorf("failed to encode consensus info, err:%s", err)
-		return
+		return fmt.Errorf("failed to encode consensus info, err:%s", err)
 	}
 	block.Header.ConsensusInfo = data
+	pow.currMiningHeader = nil
 	pow.commit(block)
+	return nil
 }
 
 func (pow *ProofOfWork) Finalize(header *types.Header, state *state.StateDB, txs types.Transactions, receipts types.Receipts) (*types.Block, error) {
+	// reward miner
+	pow.state.AddBalance(header.Coinbase, new(big.Int).SetUint64(minerReward))
+
+	// calculate state root
 	root, err := state.IntermediateRoot()
 	if err != nil {
 		return nil, err
@@ -250,6 +279,19 @@ func (pow *ProofOfWork) commit(block *types.Block) {
 	go pow.event.Post(&core.CommitBlockEvent{block})
 }
 
+func (pow *ProofOfWork) commitComplete(block *types.Block) {
+	pow.blockPool.UpdateChainHeight(block.Height())
+	pow.txPool.Drop(block.Transactions)
+
+	pow.processLock <- struct{}{}
+	go pow.broadcast(block)
+	if !pow.config.Miner {
+		go pow.process()
+	} else {
+		go pow.proposeBlock()
+	}
+}
+
 func (pow *ProofOfWork) broadcast(block *types.Block) error {
 	data, err := block.Serialize()
 	if err != nil {
@@ -268,36 +310,23 @@ func (pow *ProofOfWork) Protocols() []p2p.Protocol {
 }
 
 // adjustDiff adjust difficulty of mining blocks
-func (pow *ProofOfWork) adjustDiff() {
+func (pow *ProofOfWork) adjustDiff() (uint64, error) {
 	curr := pow.chain.LastBlock()
-	bnum := atomic.LoadUint64(&pow.blockNum)
-	if bnum < 20160 {
-		return
+	if atomic.LoadUint64(&pow.blockNum) < blockGapForDiffAdjust {
+		return pow.difficulty()
 	}
-	old := pow.chain.GetBlockByHeight(bnum)
-	duration := time.Duration(new(big.Int).Sub(curr.Time(), old.Time()).Int64()).Nanoseconds()
-	week := 7 * 24 * time.Hour
-	if duration < week.Nanoseconds()/4 {
-		// if duration is lower than 1/4 week time, set to 1/4 week time
-		duration = week.Nanoseconds() / 4
-	} else if duration > week.Nanoseconds()*4 {
-		// if duration is larger than 4 times of a week time, set to 4. week time.
-		duration = week.Nanoseconds() * 4
+	old := pow.chain.GetBlockByHeight(curr.Height() - blockGapForDiffAdjust)
+	currDiff, err := pow.difficulty()
+	if err != nil {
+		return 0, err
 	}
-	oldTarget := computeTarget(pow.difficulty)
-	newTarget := new(big.Int).Mul(oldTarget, new(big.Int).SetUint64(uint64(duration)))
-	maxTarget := new(big.Int).SetUint64(math.MaxUint64)
-	// if larger than max target
-	if newTarget.Cmp(maxTarget) == 1 {
-		newTarget = maxTarget
+	newDiff := computeNewDiff(currDiff, curr, old)
+	if newDiff > maxDiffculty {
+		newDiff = maxDiffculty
 	}
-
-	newDiff := maxTarget.Div(maxTarget, newTarget)
-	maxDiff := new(big.Int).SetUint64(maxDiffculty)
-	if newDiff.Cmp(maxDiff) == 1 {
-		newDiff = maxDiff
-	}
-	pow.difficulty = newDiff.Uint64()
+	atomic.StoreUint64(&pow.currDiff, newDiff)
+	atomic.StoreUint64(&pow.blockNum, 0)
+	return newDiff, nil
 }
 
 type nonceChan struct {

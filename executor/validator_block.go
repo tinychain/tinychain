@@ -8,6 +8,7 @@ import (
 )
 
 var (
+	errTimestampInvalid    = errors.New("timestamp of the block should be larger than that of parent block")
 	errTxRootNotEqual      = errors.New("txs root is not equal")
 	errReceiptRootNotEqual = errors.New("receipts root is not equal")
 	errStateRootNotEqual   = errors.New("state root is not equal")
@@ -36,7 +37,10 @@ func NewBlockValidator(config *common.Config, chain Blockchain) *BlockValidatorI
 // 5. Validate transactions and tx root
 func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 	//  TODO Check timestamp
-
+	parent := v.chain.GetBlockByHash(block.ParentHash())
+	if block.Time().Cmp(parent.Time()) <= 0 {
+		return errTimestampInvalid
+	}
 
 	if block.GasUsed() > block.GasLimit() {
 		return errGasUsedOverflow

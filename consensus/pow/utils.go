@@ -4,26 +4,53 @@ import (
 	"tinychain/common"
 	"tinychain/core/types"
 	"math/big"
-	"github.com/ethereum/go-ethereum/common/math"
+	"encoding/binary"
+	"math"
+	"encoding/json"
+	"time"
 )
 
-func computeHash(difficulty uint64, nonce uint64, block *types.Block) ([]byte, error) {
-	consensus := &consensusInfo{
-		Difficulty: difficulty,
-		Nonce:      nonce,
+func computeHash(nonce uint64, header *types.Header) ([]byte, error) {
+	var nonceBytes []byte
+	binary.BigEndian.PutUint64(nonceBytes, nonce)
+	hash := header.HashNoConsensus().Bytes()
+	hash = append(hash, nonceBytes...)
+	return common.Sha256(hash).Bytes(), nil
+}
+
+// computeNewDiff computed new difficulty with old diff and time duration
+func computeNewDiff(currDiff uint64, curr *types.Block, old *types.Block) uint64 {
+	duration := time.Duration(new(big.Int).Sub(curr.Time(), old.Time()).Int64())
+	week := 7 * 24 * time.Hour
+	if duration < week/4 {
+		// if duration is lower than 1/4 week time, set to 1/4 week time
+		duration = week / 4
+	} else if duration > week*4 {
+		// if duration is larger than 4 times of a week time, set to 4. week time.
+		duration = week * 4
 	}
-	data, err := consensus.Serialize()
-	if err != nil {
-		return nil, err
+	oldTarget := computeTarget(currDiff)
+	total := new(big.Int).Mul(oldTarget, new(big.Int).SetInt64(int64(duration)))
+	newTarget := total.Div(total, new(big.Int).SetInt64(int64(week)))
+	maxTarget := new(big.Int).SetUint64(math.MaxUint64)
+	// if larger than max target
+	if newTarget.Cmp(maxTarget) == 1 {
+		newTarget = maxTarget
 	}
-	clone := block.Clone()
-	clone.Header.ConsensusInfo = data
-	seed := clone.Hash()
-	hash := common.Sha256(seed.Bytes())
-	return hash.Bytes(), nil
+
+	return maxTarget.Div(maxTarget, newTarget).Uint64()
 }
 
 func computeTarget(difficulty uint64) *big.Int {
 	maxTarget := new(big.Int).SetUint64(math.MaxUint64)
 	return maxTarget.Div(maxTarget, new(big.Int).SetUint64(difficulty))
+}
+
+func decodeConsensusInfo(d []byte) (*consensusInfo, error) {
+	ci := &consensusInfo{}
+	err := json.Unmarshal(d, ci)
+	if err != nil {
+		return nil, err
+	}
+	return ci, nil
 }

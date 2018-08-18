@@ -28,6 +28,7 @@ type Processor interface {
 type Blockchain interface {
 	LastBlock() *types.Block
 	AddBlock(block *types.Block) error
+	GetBlockByHash(hash common.Hash) *types.Block
 	CommitBlock(block *types.Block) error
 }
 

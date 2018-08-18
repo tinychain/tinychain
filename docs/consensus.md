@@ -30,11 +30,12 @@ Proof-of-work is actually to compute a difficult work violently. Base on the ine
 
 `target` is calculated with `target = MAXIMUM_TARGET / difficulty`. `MAXIMUM_TARGET`is a predefined limit(2^(256-32)), which is the same as bitcoin; `diffculty` is difficulty, stored in the field `consensus info` of blocks.
 
-Difficulty will be adjusted every 20160 blocks mined. And the adjustment formula is `new_target = curr_target * actual duration of 20160 blocks / theoretical durationof 20160 blocks`
+Difficulty will be adjusted every 20160 blocks mined. And the adjustment formula is `new_target = curr_target * actual duration of 20160 blocks / theoretical duration of 20160 blocks`
 
 We need to care about some details in implementation:
 - prevent boom of difficulty
-    -
+    - if the last 20160 blocks take less than 1/4 week, then use 1/4 week as duration to prevent difficulty increasing more than 4 times.
+    - if the last 2016 blocks take larger than 4. week, then use 4. week as duration to prevent difficulty decreasing more than 4 times.
 - if the new difficulty is lower than the minimum limit(namely 1), use the minimum.
 - if the new difficulty is larger than the maximum limit(namely 2^(256-32)), use the maximum. 
 
