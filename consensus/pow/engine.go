@@ -53,7 +53,7 @@ type ProofOfWork struct {
 	event            *event.TypeMux
 	chain            Blockchain
 	state            *state.StateDB
-	blockPool        common.BlockPool
+	blockPool        *blockpool.BlockPool
 	txPool           *txpool.TxPool
 	blValidator      executor.BlockValidator // block validator
 	csValidator      *csValidator            // consensus validator
@@ -78,7 +78,6 @@ type ProofOfWork struct {
 }
 
 func New(config *common.Config, chain Blockchain, state *state.StateDB, validator executor.BlockValidator) (*ProofOfWork, error) {
-	// TODO config resolve
 	conf := newConfig(config)
 
 	csValidator := newCsValidator(chain)
