@@ -7,9 +7,8 @@ import (
 	json "github.com/json-iterator/go"
 	"github.com/libp2p/go-libp2p-crypto"
 	"errors"
-	"tinychain/bmt"
+	"tinychain/core/bmt"
 	"tinychain/db/leveldb"
-	"strconv"
 )
 
 const (
@@ -141,8 +140,12 @@ type Transactions []*Transaction
 
 func (txs Transactions) Hash() common.Hash {
 	txSet := bmt.WriteSet{}
-	for i, tx := range txs {
-		txSet[strconv.Itoa(i)] = tx.Hash().Bytes()
+	for _, tx := range txs {
+		data, err := tx.Serialize()
+		if err != nil {
+			return common.Hash{}
+		}
+		txSet[tx.Hash().String()] = data
 	}
 	root, _ := bmt.Hash(txSet)
 	return root
@@ -151,7 +154,11 @@ func (txs Transactions) Hash() common.Hash {
 func (txs Transactions) Commit(db *leveldb.LDBDatabase) error {
 	txSet := bmt.WriteSet{}
 	for _, tx := range txs {
-		txSet[tx.Hash().String()] = tx.Hash().Bytes()
+		data, err := tx.Serialize()
+		if err != nil {
+			return err
+		}
+		txSet[tx.Hash().String()] = data
 	}
 	return bmt.Commit(txSet, db)
 }

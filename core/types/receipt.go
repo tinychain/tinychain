@@ -3,7 +3,7 @@ package types
 import (
 	"tinychain/common"
 	json "github.com/json-iterator/go"
-	"tinychain/bmt"
+	"tinychain/core/bmt"
 	"strconv"
 )
 

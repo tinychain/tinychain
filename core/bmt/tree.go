@@ -16,6 +16,7 @@ var (
 const (
 	defaultHashTableCap = 4
 	defaultAggreation   = 2
+	evictBlockGap       = 1000
 )
 
 // Write set for tree prepare

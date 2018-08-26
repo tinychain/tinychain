@@ -5,7 +5,9 @@ import (
 	"math/big"
 	json "github.com/json-iterator/go"
 	"tinychain/db/leveldb"
-	"tinychain/bmt"
+	"tinychain/core/bmt"
+	"tinychain/common/cache"
+	"tinychain/core/chain"
 )
 
 var (
@@ -16,16 +18,18 @@ var (
 type Storage map[common.Hash][]byte
 
 type stateObject struct {
+	sdb     *StateDB
 	address common.Address
 	data    *Account
 	code    []byte     // contract code bytes
 	bmt     BucketTree // bucket tree of this account
 
-	cacheStorage Storage // storage cache
-	dirtyStorage Storage // dirty storage
+	cacheStorage    Storage      // storage cache
+	lbnCacheStorage *cache.Cache // latest block number storage cache
+	dirtyStorage    Storage      // dirty storage
 
 	dirtyCode bool // code is updated or not
-	suicided   bool
+	suicided  bool
 	deleted   bool
 }
 
@@ -44,12 +48,14 @@ func (s *Account) Deserialize(data []byte) error {
 	return json.Unmarshal(data, s)
 }
 
-func newStateObject(address common.Address, data *Account) *stateObject {
+func newStateObject(state *StateDB, address common.Address, data *Account) *stateObject {
 	return &stateObject{
-		address:      address,
-		data:         data,
-		cacheStorage: make(Storage),
-		dirtyStorage: make(Storage),
+		sdb:             state,
+		address:         address,
+		data:            data,
+		cacheStorage:    make(Storage),
+		lbnCacheStorage: cache.NewCache(cache.NewLBN()),
+		dirtyStorage:    make(Storage),
 	}
 }
 
@@ -113,18 +119,24 @@ func (s *stateObject) GetState(key common.Hash) []byte {
 	if val, exist := s.cacheStorage[key]; exist {
 		return val
 	}
+
+	if val, _ := s.lbnCacheStorage.Get(key); val != nil {
+		return val.([]byte)
+	}
+
 	// Load slot from bucket merkel tree
 	val, err := s.bmt.Get(key.Bytes())
 	if err != nil {
 		return nil
 	}
-	s.SetState(key, val)
+	s.SetState(key, val, chain.GetHeightOfChain())
 	return val
 
 }
 
-func (s *stateObject) SetState(key common.Hash, value []byte) {
+func (s *stateObject) SetState(key common.Hash, value []byte, blockNum uint64) {
 	s.cacheStorage[key] = value
+	s.lbnCacheStorage.Add(key, value, blockNum)
 	s.dirtyStorage[key] = value
 }
 
@@ -149,12 +161,13 @@ func (s *stateObject) Commit(batch *leveldb.Batch) error {
 		return err
 	}
 	s.data.Root = s.bmt.Hash()
+	s.evict()
 	return nil
 }
 
 func (s *stateObject) deepCopy() *stateObject {
 	newAcc := *s.data
-	sobj := newStateObject(s.address, &newAcc)
+	sobj := newStateObject(s.sdb, s.address, &newAcc)
 	sobj.code = s.code
 	sobj.dirtyCode = s.dirtyCode
 	if tree := s.bmt; tree != nil {
@@ -169,4 +182,14 @@ func (s *stateObject) empty() bool {
 
 func (s *stateObject) markSuicided() {
 	s.suicided = true
+}
+
+func (s *stateObject) evict() {
+	n := s.lbnCacheStorage.EvictWithStrategy(func(blockNum uint64) bool {
+		if chain.GetHeightOfChain() < evictBlockGap {
+			return false
+		}
+		return blockNum <= chain.GetHeightOfChain()-evictBlockGap
+	})
+	log.Debugf("evict %d state value after commit at height #%d", n, chain.GetHeightOfChain())
 }

@@ -9,6 +9,8 @@ import (
 	"errors"
 	"sort"
 	"tinychain/db/leveldb"
+	"tinychain/common/cache"
+	"tinychain/core/chain"
 )
 
 type Bucket struct {
@@ -86,6 +88,7 @@ type HashTable struct {
 	Cap        int           `json:"cap"`
 	BucketHash []common.Hash `json:"bucket_hash"`
 	buckets    []*Bucket
+	bcache     *cache.Cache
 	dirty      []bool
 	lock       sync.RWMutex
 }
@@ -95,6 +98,7 @@ func NewHashTable(db *BmtDB, cap int) *HashTable {
 		db:         db,
 		Cap:        cap,
 		buckets:    make([]*Bucket, cap, cap),
+		bcache:     cache.NewCache(cache.NewLBN()),
 		BucketHash: make([]common.Hash, cap, cap),
 		dirty:      make([]bool, cap, cap),
 	}
@@ -107,6 +111,7 @@ func (ht *HashTable) copy() *HashTable {
 		nb := *bucket
 		newBuckets = append(newBuckets, &nb)
 	}
+	newHT.bcache = cache.NewCache(cache.NewLBN())
 	newHT.buckets = newBuckets
 	return &newHT
 }
@@ -139,11 +144,11 @@ func (ht *HashTable) put(key string, value []byte) error {
 			if err != nil {
 				return err
 			}
-			ht.buckets[index] = bucket
 		} else {
 			bucket = NewBucket()
-			ht.buckets[index] = bucket
 		}
+		ht.buckets[index] = bucket
+		ht.bcache.Add(index, bucket, chain.GetHeightOfChain())
 	}
 	oldVal := bucket.Slots[key]
 	if bytes.Compare(oldVal, value) != 0 {
@@ -169,7 +174,10 @@ func (ht *HashTable) get(key string) ([]byte, error) {
 	index := ht.getIndex(key)
 	bucket = ht.buckets[index]
 	if bucket == nil {
-		if hash := ht.BucketHash[index]; !hash.Nil() && ht.db != nil {
+		if val, _ := ht.bcache.Get(index); val != nil {
+			bucket = val.(*Bucket)
+			ht.buckets[index] = bucket
+		} else if hash := ht.BucketHash[index]; !hash.Nil() && ht.db != nil {
 			// Get bucket from db by bucket_hash
 			bucket, err = ht.db.GetBucket(ht.BucketHash[index])
 			if err != nil {
@@ -204,5 +212,17 @@ func (ht *HashTable) commit(batch *leveldb.Batch) error {
 			ht.BucketHash[i] = bucket.Hash()
 		}
 	}
+	ht.buckets = make([]*Bucket, ht.Cap, ht.Cap)
+	ht.evict()
 	return nil
+}
+
+func (ht *HashTable) evict() {
+	currHeight := chain.GetHeightOfChain()
+	ht.bcache.EvictWithStrategy(func(blockNum uint64) bool {
+		if currHeight < evictBlockGap {
+			return false
+		}
+		return blockNum <= currHeight-evictBlockGap
+	})
 }

@@ -2,10 +2,16 @@ package state
 
 import (
 	"tinychain/common"
-	"tinychain/bmt"
+	"tinychain/core/bmt"
 	"tinychain/db/leveldb"
 	"math/big"
 	"fmt"
+	"tinychain/common/cache"
+	"tinychain/core/chain"
+)
+
+const (
+	evictBlockGap = 1000
 )
 
 var (
@@ -37,6 +43,7 @@ type StateDB struct {
 
 	stateObjects      map[common.Address]*stateObject // live state objects
 	stateObjectsDirty map[common.Address]struct{}     // dirty state objects
+	cacheStateObj     *cache.Cache
 }
 
 func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
@@ -51,6 +58,7 @@ func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 		bmt:               tree,
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
+		cacheStateObj:     cache.NewCache(cache.NewLBN()),
 	}, nil
 }
 
@@ -63,6 +71,13 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 		}
 		return stateObj
 	}
+
+	if val, _ := sdb.cacheStateObj.Get(addr); val != nil {
+		stateObj := val.(*stateObject)
+		sdb.stateObjects[addr] = stateObj
+		return stateObj
+	}
+
 	data, err := sdb.bmt.Get(addr.Bytes())
 	if err != nil {
 		return nil
@@ -72,7 +87,7 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 	if err != nil {
 		return nil
 	}
-	stateObj := newStateObject(addr, account)
+	stateObj := newStateObject(sdb, addr, account)
 	code, err := sdb.db.GetCode(account.CodeHash)
 	if err == nil {
 		stateObj.SetCode(code)
@@ -87,7 +102,7 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 		Nonce:   uint64(0),
 		Balance: new(big.Int),
 	}
-	newObj := newStateObject(addr, account)
+	newObj := newStateObject(sdb, addr, account)
 	sdb.journal.append(createObjectChange{&addr})
 	sdb.setStateObj(newObj)
 	return newObj
@@ -96,6 +111,7 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 // Set "live" state object
 func (sdb *StateDB) setStateObj(object *stateObject) {
 	sdb.stateObjects[object.Address()] = object
+	sdb.cacheStateObj.Add(object.Address(), object, chain.GetHeightOfChain())
 	sdb.stateObjectsDirty[object.Address()] = struct{}{}
 }
 
@@ -117,7 +133,7 @@ func (sdb *StateDB) SetState(addr common.Address, key common.Hash, value []byte)
 			Key:     key,
 			PreVal:  stateObj.GetState(key),
 		})
-		stateObj.SetState(key, value)
+		stateObj.SetState(key, value, chain.GetHeightOfChain())
 	}
 }
 
@@ -264,6 +280,7 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 			// Delete stateObject
 			stateObj.deleted = true
 			dirtySet[addr.String()] = nil
+			sdb.cacheStateObj.Delete(addr)
 		case isDirty:
 			stateobj := sdb.stateObjects[addr]
 			// Put account data to dirtySet to update world state tree
@@ -289,7 +306,19 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 	if err := sdb.bmt.Commit(batch); err != nil {
 		return common.Hash{}, err
 	}
+	sdb.reset() // reset state object mem cache
 	return sdb.bmt.Hash(), nil
+}
+
+func (sdb *StateDB) reset() {
+	sdb.stateObjects = make(map[common.Address]*stateObject)
+	sdb.stateObjectsDirty = make(map[common.Address]struct{})
+	sdb.cacheStateObj.EvictWithStrategy(func(blockNum uint64) bool {
+		if chain.GetHeightOfChain() < evictBlockGap {
+			return false
+		}
+		return blockNum < chain.GetHeightOfChain()-evictBlockGap
+	})
 }
 
 // Snapshot returns an identifier for the current revision of the state.

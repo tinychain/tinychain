@@ -1,16 +1,14 @@
-package core
+package chain
 
 import (
 	"tinychain/db"
 	"github.com/hashicorp/golang-lru"
 	"tinychain/core/types"
-	"tinychain/consensus"
 	"tinychain/common"
 	"sync/atomic"
 	"sync"
 	"errors"
 	"fmt"
-	"tinychain/core/state"
 )
 
 var (
@@ -24,23 +22,21 @@ const (
 
 // Blockchain is the canonical chain given a database with a genesis block
 type Blockchain struct {
-	db             *db.TinyDB       // chain db
-	genesis        *types.Block     // genesis block
-	lastBlock      atomic.Value     // last block of chain
-	lastFinalBlock atomic.Value     // last final block of chian
-	engine         consensus.Engine // consensus engine
+	db             *db.TinyDB   // chain db
+	genesis        *types.Block // genesis block
+	lastBlock      atomic.Value // last block of chain
+	lastFinalBlock atomic.Value // last final block of chian
 	mu             sync.RWMutex
 
 	blocksCache *lru.Cache // blocks lru cache
 	headerCache *lru.Cache // headers lru cache
 }
 
-func NewBlockchain(db *db.TinyDB, engine consensus.Engine) (*Blockchain, error) {
+func NewBlockchain(db *db.TinyDB) (*Blockchain, error) {
 	blocksCache, _ := lru.New(blockCacheLimit)
 	headerCache, _ := lru.New(headerCacheLimit)
 	bc := &Blockchain{
 		db:          db,
-		engine:      engine,
 		blocksCache: blocksCache,
 		headerCache: headerCache,
 	}
@@ -49,7 +45,7 @@ func NewBlockchain(db *db.TinyDB, engine consensus.Engine) (*Blockchain, error) 
 		return nil, err
 	}
 	bc.genesis = bc.GetBlockByHeight(0)
-
+	initChain(bc)
 	return bc, nil
 }
 
@@ -59,11 +55,6 @@ func (bc *Blockchain) loadLastState() error {
 	if lastBlock != nil {
 		// Should create genensis block
 		return bc.Reset()
-	}
-
-	if _, err := state.New(bc.db.LDB(), lastBlock.StateRoot().Bytes()); err != nil {
-		log.Errorf("failed to init state, err:%s", err)
-		return err
 	}
 
 	bc.blocksCache.Add(lastBlock.Height(), lastBlock)
@@ -79,11 +70,6 @@ func (bc *Blockchain) Reset() error {
 
 func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
 	bc.clear()
-
-	if _, err := state.New(bc.db.LDB(), genesis.StateRoot().Bytes()); err != nil {
-		log.Errorf("failed to reset blockchain with genesis, err:%s", err)
-		return err
-	}
 
 	if err := bc.db.PutBlock(bc.db.LDB().NewBatch(), genesis, false, true); err != nil {
 		log.Errorf("failed to put genesis into db, err:%s", err)
@@ -109,6 +95,10 @@ func (bc *Blockchain) clear() {
 	bc.lastBlock.Store(nil)
 	bc.blocksCache.Purge()
 	bc.headerCache.Purge()
+}
+
+func (bc *Blockchain) LastHeight() uint64 {
+	return bc.LastBlock().Height()
 }
 
 // LastBlock returns the last block of latest blockchain in memory
@@ -222,8 +212,4 @@ func (bc *Blockchain) CommitBlock(block *types.Block) error {
 	}
 	bc.lastFinalBlock.Store(block)
 	return nil
-}
-
-func (bc *Blockchain) Engine() consensus.Engine {
-	return bc.engine
 }
