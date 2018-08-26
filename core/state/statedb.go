@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"tinychain/common/cache"
 	"tinychain/core/chain"
+	"sync/atomic"
 )
 
 const (
@@ -27,6 +28,7 @@ type BucketTree interface {
 	Commit(batch *leveldb.Batch) error
 	Get(key []byte) ([]byte, error)
 	Copy() *bmt.BucketTree
+	Purge()
 }
 
 type revision struct {
@@ -40,6 +42,7 @@ type StateDB struct {
 	revision       []revision // snapshot version index manager
 	journal        *journal   // journal of undo
 	bmt            BucketTree // bucket merkle tree of global state
+	bmtCacheHeight uint64     // chain height at which last release of bucket tree cache
 
 	stateObjects      map[common.Address]*stateObject // live state objects
 	stateObjectsDirty map[common.Address]struct{}     // dirty state objects
@@ -56,6 +59,7 @@ func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 		db:                newCacheDB(db),
 		journal:           newJournal(),
 		bmt:               tree,
+		bmtCacheHeight:    chain.GetHeightOfChain(),
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
 		cacheStateObj:     cache.NewCache(cache.NewLBN()),
@@ -313,12 +317,18 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 func (sdb *StateDB) reset() {
 	sdb.stateObjects = make(map[common.Address]*stateObject)
 	sdb.stateObjectsDirty = make(map[common.Address]struct{})
+	// should cache be evict
 	sdb.cacheStateObj.EvictWithStrategy(func(blockNum uint64) bool {
 		if chain.GetHeightOfChain() < evictBlockGap {
 			return false
 		}
 		return blockNum < chain.GetHeightOfChain()-evictBlockGap
 	})
+	// clear bucket tree's cache with strategy
+	if chain.GetHeightOfChain()-sdb.bmtCacheHeight > evictBlockGap {
+		atomic.StoreUint64(&sdb.bmtCacheHeight, chain.GetHeightOfChain())
+		sdb.bmt.Purge()
+	}
 }
 
 // Snapshot returns an identifier for the current revision of the state.

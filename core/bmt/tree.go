@@ -16,7 +16,6 @@ var (
 const (
 	defaultHashTableCap = 4
 	defaultAggreation   = 2
-	evictBlockGap       = 1000
 )
 
 // Write set for tree prepare
@@ -254,6 +253,12 @@ func (bt *BucketTree) Copy() *BucketTree {
 func (bt *BucketTree) Verify(data []byte) {
 	// TODO verify data
 
+}
+
+// Purge release the cache memory to avoid mem peak
+func (bt *BucketTree) Purge() {
+	bt.hashTable.purge()
+	bt.node = sync.Map{}
 }
 
 // Get data from hash table by key
