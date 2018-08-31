@@ -8,7 +8,7 @@ import (
 	"github.com/libp2p/go-libp2p-peer"
 	"tinychain/p2p"
 	"tinychain/consensus/dpos_bft"
-	"tinychain/executor"
+	"tinychain/core/executor"
 )
 
 type Engine interface {

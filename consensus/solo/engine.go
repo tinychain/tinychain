@@ -9,7 +9,7 @@ import (
 	"tinychain/event"
 	"tinychain/core"
 	"tinychain/p2p"
-	"tinychain/executor"
+	"tinychain/core/executor"
 	"tinychain/core/txpool"
 	"time"
 	"math/big"
@@ -33,7 +33,7 @@ type SoloEngine struct {
 	config    *Config
 	chain     Blockchain
 	validator executor.BlockValidator
-	blockPool common.BlockPool
+	blockPool *blockpool.BlockPool
 	txPool    *txpool.TxPool
 	state     *state.StateDB
 	event     *event.TypeMux

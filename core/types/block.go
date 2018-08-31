@@ -140,7 +140,7 @@ func (bl *Block) Hash() common.Hash {
 	if hash := bl.hash.Load(); hash != nil {
 		return hash.(common.Hash)
 	}
-	if bl.Header.TxRoot.Nil() {
+	if bl.Header.TxRoot.Nil() && bl.Transactions != nil {
 		bl.Header.TxRoot = bl.Transactions.Hash()
 	}
 	hash := bl.Header.Hash()

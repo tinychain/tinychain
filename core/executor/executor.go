@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"tinychain/db"
 	"sync"
+	"tinychain/core/chain"
 )
 
 var (
@@ -25,18 +26,12 @@ type Processor interface {
 	Process(block *types.Block) (types.Receipts, error)
 }
 
-type Blockchain interface {
-	LastBlock() *types.Block
-	AddBlock(block *types.Block) error
-	GetBlockByHash(hash common.Hash) *types.Block
-	CommitBlock(block *types.Block) error
-}
-
 type Executor struct {
+	conf      *common.Config
 	db        *db.TinyDB
 	processor Processor
-	chain     Blockchain    // Blockchain wrapper
-	batch     batcher.Batch // Batch for creating new block
+	chain     *chain.Blockchain // Blockchain wrapper
+	batch     batcher.Batch     // Batch for creating new block
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
@@ -51,17 +46,36 @@ type Executor struct {
 	commitSub       event.Subscription // Subscribe state commit event
 }
 
-func New(config *common.Config, db *db.TinyDB, chain *core.Blockchain, statedb *state.StateDB, engine consensus.Engine) *Executor {
-	processor := core.NewStateProcessor(chain, statedb, engine)
+func New(config *common.Config, db *db.TinyDB, chain *chain.Blockchain, engine consensus.Engine) *Executor {
 	executor := &Executor{
-		db:        db,
-		processor: processor,
-		chain:     chain,
-		engine:    engine,
-		event:     event.GetEventhub(),
-		quitCh:    make(chan struct{}),
+		conf:   config,
+		db:     db,
+		chain:  chain,
+		engine: engine,
+		event:  event.GetEventhub(),
+		quitCh: make(chan struct{}),
 	}
 	return executor
+}
+
+func (ex *Executor) Init() error {
+	genesis := ex.chain.Genesis()
+	if genesis == nil {
+		newGenesis, err := ex.createGenesis()
+		if err != nil {
+			log.Errorf("failed to create genesis when init executor, %s", err)
+			return err
+		}
+		genesis = newGenesis
+	}
+	statedb, err := state.New(ex.db.LDB(), genesis.StateRoot().Bytes())
+	if err != nil {
+		log.Errorf("failed to init state when init executor, %s", err)
+		return err
+	}
+	ex.state = statedb
+	ex.processor = NewStateProcessor(ex.chain, statedb, ex.engine)
+	return nil
 }
 
 func (ex *Executor) Start() error {

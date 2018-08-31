@@ -4,7 +4,7 @@ import (
 	"tinychain/core/state"
 	"tinychain/db/leveldb"
 	"testing"
-	"tinychain/executor"
+	"tinychain/core/executor"
 	"tinychain/event"
 	"tinychain/core"
 	"tinychain/core/types"

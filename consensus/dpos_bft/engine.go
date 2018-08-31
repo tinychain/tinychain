@@ -15,7 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p-peer"
 	"sync"
 	"tinychain/consensus"
-	"tinychain/executor"
+	"tinychain/core/executor"
 	"tinychain/core/txpool"
 )
 
@@ -57,10 +57,10 @@ type Engine struct {
 	seqNo            atomic.Value             // next block height at bft processing
 	chain            Blockchain               // current blockchain
 	peerPool         *peerPool                // manage and operate block producers' info
-	blockPool        consensus.BlockPool      // pool to retrieves new proposed blocks
+	blockPool        blockpool.BlockPool      // pool to retrieves new proposed blocks
 	txPool           TxPool                   // TxPool used to filter out valid transactions
 	receipts         sync.Map                 // save receipts of block map[uint64]receipts
-	validator        consensus.BlockValidator // Block validator to validate state
+	validator        executor.BlockValidator // Block validator to validate state
 	execCompleteChan chan struct{}            // channel for informing the process is completed
 
 	bftState       atomic.Value // the state of current bft period

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"tinychain/common"
 	"tinychain/db/leveldb"
+	"bytes"
 )
 
 var (
@@ -71,7 +72,7 @@ func (bt *BucketTree) Init(rootHash []byte) error {
 		root *MerkleNode
 		err  error
 	)
-	if rootHash == nil {
+	if rootHash == nil || bytes.Compare(rootHash, []byte{}) == 0 {
 		// Create a new root node
 		root = NewMerkleNode(bt.db, newPos(0, 0), bt.Aggreation)
 

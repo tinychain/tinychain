@@ -15,7 +15,7 @@ import (
 	"math/big"
 	"time"
 	"tinychain/consensus/blockpool"
-	"tinychain/executor"
+	"tinychain/core/executor"
 	"tinychain/core/txpool"
 	"sync/atomic"
 	"fmt"

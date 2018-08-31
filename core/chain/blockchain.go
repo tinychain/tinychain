@@ -8,11 +8,14 @@ import (
 	"sync/atomic"
 	"tinychain/common"
 	"tinychain/core/types"
-	"tinychain/db"
+	tdb "tinychain/db"
+	"tinychain/db/leveldb"
 )
 
 var (
 	log = common.GetLogger("blockchain")
+
+	errGenesisExist = errors.New("genesis has existed")
 )
 
 const (
@@ -22,7 +25,7 @@ const (
 
 // Blockchain is the canonical chain given a database with a genesis block
 type Blockchain struct {
-	db             *db.TinyDB   // chain db
+	db             *tdb.TinyDB  // chain db
 	genesis        *types.Block // genesis block
 	lastBlock      atomic.Value // last block of chain
 	lastFinalBlock atomic.Value // last final block of chian
@@ -32,34 +35,36 @@ type Blockchain struct {
 	headerCache *lru.Cache // headers lru cache
 }
 
-func NewBlockchain(db *db.TinyDB) (*Blockchain, error) {
+func NewBlockchain(db *leveldb.LDBDatabase) (*Blockchain, error) {
 	blocksCache, _ := lru.New(blockCacheLimit)
 	headerCache, _ := lru.New(headerCacheLimit)
 	bc := &Blockchain{
-		db:          db,
+		db:          tdb.NewTinyDB(db),
 		blocksCache: blocksCache,
 		headerCache: headerCache,
-	}
-	if err := bc.loadLastState(); err != nil {
-		log.Errorf("failed to load last state from db, err:%s", err)
-		return nil, err
 	}
 	bc.genesis = bc.GetBlockByHeight(0)
 	initChain(bc)
 	return bc, nil
 }
 
-// loadLastState load the latest state of blockchain
-func (bc *Blockchain) loadLastState() error {
-	lastBlock := bc.LastBlock()
-	if lastBlock != nil {
-		// Should create genensis block
-		return bc.Reset()
+func (bc *Blockchain) Genesis() *types.Block {
+	return bc.genesis
+}
+
+func (bc *Blockchain) SetGenesis(genesis *types.Block) error {
+	if bc.genesis != nil {
+		return errGenesisExist
+	}
+	bc.genesis = genesis
+	if err := bc.AddBlock(genesis); err != nil {
+		return err
 	}
 
-	bc.blocksCache.Add(lastBlock.Height(), lastBlock)
-	// TODO
-
+	if err := bc.db.PutBlock(tdb.GetBatch(bc.db.LDB(), 0), genesis, true, true); err != nil {
+		log.Errorf("failed to persist genesis, %s", err)
+		return err
+	}
 	return nil
 }
 
@@ -69,7 +74,6 @@ func (bc *Blockchain) Reset() error {
 }
 
 func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
-	bc.clear()
 
 	if err := bc.db.PutBlock(bc.db.LDB().NewBatch(), genesis, false, true); err != nil {
 		log.Errorf("failed to put genesis into db, err:%s", err)
@@ -81,6 +85,7 @@ func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
 		log.Errorf("failed to put genesis hash into db, err:%s", err)
 		return err
 	}
+	bc.purge()
 	bc.blocksCache.Add(genesis.Height(), genesis)
 	bc.genesis = genesis
 	bc.lastBlock.Store(genesis)
@@ -88,7 +93,7 @@ func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
 	return nil
 }
 
-func (bc *Blockchain) clear() {
+func (bc *Blockchain) purge() {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
@@ -217,7 +222,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 // commit persist the block to db.
 func (bc *Blockchain) CommitBlock(block *types.Block) error {
 	// Put block to db.Batch
-	bc.db.PutBlock(db.GetBatch(bc.db.LDB(), block.Height()), block, false, false)
+	bc.db.PutBlock(tdb.GetBatch(bc.db.LDB(), block.Height()), block, false, false)
 	if err := bc.db.PutLastBlock(block.Hash()); err != nil {
 		log.Errorf("failed to put last block hash to db, err:%s", err)
 		return err

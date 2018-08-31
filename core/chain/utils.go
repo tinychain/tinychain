@@ -1,15 +1,22 @@
 package chain
 
-import "tinychain/core/types"
+import (
+	"tinychain/core/types"
+	"sync"
+)
 
 var (
 	chain *Blockchain
+	once  sync.Once
 )
 
 func initChain(bc *Blockchain) {
-	if chain == nil {
-		chain = bc
-	}
+	once.Do(func() {
+		if chain == nil {
+			chain = bc
+		}
+	})
+
 }
 
 func GetHeightOfChain() uint64 {

@@ -6,9 +6,10 @@ import (
 	"tinychain/core"
 	"tinychain/db"
 	"tinychain/common"
-	"tinychain/executor"
+	"tinychain/core/executor"
 	"tinychain/db/leveldb"
 	"tinychain/core/state"
+	"tinychain/core/chain"
 )
 
 var (
@@ -23,7 +24,7 @@ type Tiny struct {
 
 	engine consensus.Engine
 
-	chain *core.Blockchain
+	chain *chain.Blockchain
 
 	db *db.TinyDB
 
