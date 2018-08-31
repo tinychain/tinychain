@@ -1,18 +1,18 @@
 package state
 
 import (
-	"tinychain/common"
-	"tinychain/core/bmt"
-	"tinychain/db/leveldb"
-	"math/big"
 	"fmt"
-	"tinychain/common/cache"
-	"tinychain/core/chain"
+	"math/big"
 	"sync/atomic"
+	"tinychain/common"
+	"tinychain/common/cache"
+	"tinychain/core/bmt"
+	"tinychain/core/chain"
+	"tinychain/db/leveldb"
 )
 
 const (
-	evictBlockGap = 1000
+	evictBlockGap = 1000 // TODO: should be a configurable parameter
 )
 
 var (
@@ -91,7 +91,7 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 	if err != nil {
 		return nil
 	}
-	stateObj := newStateObject(sdb, addr, account)
+	stateObj := newStateObject(sdb, addr, account, sdb.setDirty)
 	code, err := sdb.db.GetCode(account.CodeHash)
 	if err == nil {
 		stateObj.SetCode(code)
@@ -106,7 +106,7 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 		Nonce:   uint64(0),
 		Balance: new(big.Int),
 	}
-	newObj := newStateObject(sdb, addr, account)
+	newObj := newStateObject(sdb, addr, account, sdb.setDirty)
 	sdb.journal.append(createObjectChange{&addr})
 	sdb.setStateObj(newObj)
 	return newObj
@@ -116,7 +116,10 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 func (sdb *StateDB) setStateObj(object *stateObject) {
 	sdb.stateObjects[object.Address()] = object
 	sdb.cacheStateObj.Add(object.Address(), object, chain.GetHeightOfChain())
-	sdb.stateObjectsDirty[object.Address()] = struct{}{}
+}
+
+func (sdb *StateDB) setDirty(addr common.Address) {
+	sdb.stateObjectsDirty[addr] = struct{}{}
 }
 
 // Get state of an account with address
@@ -317,7 +320,7 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 func (sdb *StateDB) reset() {
 	sdb.stateObjects = make(map[common.Address]*stateObject)
 	sdb.stateObjectsDirty = make(map[common.Address]struct{})
-	// should cache be evict
+	// evict old cache
 	sdb.cacheStateObj.EvictWithStrategy(func(blockNum uint64) bool {
 		if chain.GetHeightOfChain() < evictBlockGap {
 			return false
