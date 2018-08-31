@@ -1,13 +1,13 @@
 package state
 
 import (
-	"tinychain/common"
-	"math/big"
 	json "github.com/json-iterator/go"
-	"tinychain/db/leveldb"
-	"tinychain/core/bmt"
+	"math/big"
+	"tinychain/common"
 	"tinychain/common/cache"
+	"tinychain/core/bmt"
 	"tinychain/core/chain"
+	"tinychain/db/leveldb"
 )
 
 var (
@@ -31,6 +31,8 @@ type stateObject struct {
 	dirtyCode bool // code is updated or not
 	suicided  bool
 	deleted   bool
+
+	onDirty func(addr common.Address)
 }
 
 type Account struct {
@@ -48,7 +50,7 @@ func (s *Account) Deserialize(data []byte) error {
 	return json.Unmarshal(data, s)
 }
 
-func newStateObject(state *StateDB, address common.Address, data *Account) *stateObject {
+func newStateObject(state *StateDB, address common.Address, data *Account, onDirty func(addr common.Address)) *stateObject {
 	return &stateObject{
 		sdb:             state,
 		address:         address,
@@ -56,6 +58,7 @@ func newStateObject(state *StateDB, address common.Address, data *Account) *stat
 		cacheStorage:    make(Storage),
 		lbnCacheStorage: cache.NewCache(cache.NewLBN()),
 		dirtyStorage:    make(Storage),
+		onDirty:         onDirty,
 	}
 }
 
@@ -83,18 +86,30 @@ func (s *stateObject) SetCode(code []byte) {
 	s.code = code
 	s.data.CodeHash = common.Sha256(code)
 	s.dirtyCode = true
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) AddBalance(amount *big.Int) {
 	s.SetBalance(new(big.Int).Add(s.data.Balance, amount))
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) SubBalance(amount *big.Int) {
 	s.SetBalance(new(big.Int).Sub(s.data.Balance, amount))
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) SetBalance(amount *big.Int) {
 	s.data.Balance = amount
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) Nonce() uint64 {
@@ -103,6 +118,9 @@ func (s *stateObject) Nonce() uint64 {
 
 func (s *stateObject) SetNonce(nonce uint64) {
 	s.data.Nonce = nonce
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) Bmt(db *leveldb.LDBDatabase) BucketTree {
@@ -138,6 +156,9 @@ func (s *stateObject) SetState(key common.Hash, value []byte, blockNum uint64) {
 	s.cacheStorage[key] = value
 	s.lbnCacheStorage.Add(key, value, blockNum)
 	s.dirtyStorage[key] = value
+	if s.onDirty != nil {
+		s.onDirty(s.address)
+	}
 }
 
 func (s *stateObject) updateRoot() (common.Hash, error) {
@@ -167,7 +188,7 @@ func (s *stateObject) Commit(batch *leveldb.Batch) error {
 
 func (s *stateObject) deepCopy() *stateObject {
 	newAcc := *s.data
-	sobj := newStateObject(s.sdb, s.address, &newAcc)
+	sobj := newStateObject(s.sdb, s.address, &newAcc, s.onDirty)
 	sobj.code = s.code
 	sobj.dirtyCode = s.dirtyCode
 	if tree := s.bmt; tree != nil {

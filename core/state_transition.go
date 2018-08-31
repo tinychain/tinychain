@@ -1,10 +1,10 @@
 package core
 
 import (
-	"math/big"
-	"tinychain/core/vm"
 	"errors"
+	"math/big"
 	"tinychain/core/types"
+	"tinychain/core/vm/evm"
 )
 
 var (
@@ -17,11 +17,11 @@ var (
 
 type StateTransition struct {
 	tx      *types.Transaction // state transition event
-	evm     *vm.EVM
-	statedb vm.StateDB
+	evm     *evm.EVM
+	statedb evm.StateDB
 }
 
-func NewStateTransition(evm *vm.EVM, tx *types.Transaction) *StateTransition {
+func NewStateTransition(evm *evm.EVM, tx *types.Transaction) *StateTransition {
 	return &StateTransition{
 		evm:     evm,
 		tx:      tx,
@@ -30,7 +30,7 @@ func NewStateTransition(evm *vm.EVM, tx *types.Transaction) *StateTransition {
 }
 
 // Make state transition by applying a new event
-func ApplyTx(evm *vm.EVM, tx *types.Transaction) ([]byte, uint64, bool, error) {
+func ApplyTx(evm *evm.EVM, tx *types.Transaction) ([]byte, uint64, bool, error) {
 	return NewStateTransition(evm, tx).Process()
 }
 
@@ -46,27 +46,27 @@ func (st *StateTransition) preCheck() error {
 	return nil
 }
 
-func (st *StateTransition) from() vm.AccountRef {
+func (st *StateTransition) from() evm.AccountRef {
 	addr := st.tx.From
 	if !st.statedb.Exist(addr) {
 		st.statedb.CreateAccount(addr)
 	}
-	return vm.AccountRef(addr)
+	return evm.AccountRef(addr)
 }
 
-func (st *StateTransition) to() vm.AccountRef {
+func (st *StateTransition) to() evm.AccountRef {
 	if st.tx == nil {
-		return vm.AccountRef{}
+		return evm.AccountRef{}
 	}
 
 	if st.tx.To.Nil() {
-		return vm.AccountRef{}
+		return evm.AccountRef{}
 	}
 	to := st.tx.To
 	//if !st.statedb.Exist(to) {
 	//	st.statedb.CreateAccount(to)
 	//}
-	return vm.AccountRef(to)
+	return evm.AccountRef(to)
 }
 
 func (st *StateTransition) data() []byte {
@@ -96,7 +96,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 		ret     []byte
 		leftGas uint64
 	)
-	if (st.to() == vm.AccountRef{}) {
+	if (st.to() == evm.AccountRef{}) {
 		// Contract create
 		ret, _, leftGas, vmerr = st.evm.Create(st.to(), st.data(), st.gas(), st.value())
 	} else {
@@ -106,7 +106,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	}
 	if vmerr != nil {
 		log.Errorf("VM returned with error %s", vmerr)
-		if vmerr == vm.ErrInsufficientBalance {
+		if vmerr == evm.ErrInsufficientBalance {
 			return nil, 0, false, vmerr
 		}
 	}

@@ -2,10 +2,10 @@
 package bmt
 
 import (
+	"errors"
+	"sync"
 	"tinychain/common"
 	"tinychain/db/leveldb"
-	"sync"
-	"errors"
 )
 
 var (
@@ -14,8 +14,8 @@ var (
 )
 
 const (
-	defaultHashTableCap = 4
-	defaultAggreation   = 2
+	defaultHashTableCap = 100000
+	defaultAggreation   = 5
 )
 
 // Write set for tree prepare
@@ -159,10 +159,7 @@ func (bt *BucketTree) Process() (common.Hash, error) {
 // Process dirty nodes
 func (bt *BucketTree) processNodes() error {
 	lowestPos := newPos(bt.llevel, 0)
-	for i, isDirty := range bt.hashTable.dirty {
-		if !isDirty {
-			continue
-		}
+	for i := range bt.hashTable.dirty {
 		lowestPos.Index = i
 		leaf, err := bt.getNode(lowestPos)
 		if err != nil {
@@ -182,7 +179,7 @@ func (bt *BucketTree) processNodes() error {
 				log.Errorf("Stop processing parent node: %s", err)
 				return err
 			}
-			parent.dirty[i%bt.Aggreation] = true
+			parent.dirty[i%bt.Aggreation] = struct{}{}
 			pos = parentPos
 			i /= bt.Aggreation
 		}
@@ -233,12 +230,12 @@ func (bt *BucketTree) commitNode(batch *leveldb.Batch, node *MerkleNode) error {
 	}
 	node.commit(batch)
 	for i, child := range node.childNodes {
-		if node.dirty[i] {
+		if _, dirty := node.dirty[i]; dirty {
 			err := bt.commitNode(batch, child)
 			if err != nil {
 				return err
 			}
-			node.dirty[i] = false
+			node.dirty[i] = struct{}{}
 		}
 	}
 	return nil

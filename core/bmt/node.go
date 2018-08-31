@@ -1,9 +1,9 @@
 package bmt
 
 import (
-	"tinychain/common"
 	json "github.com/json-iterator/go"
 	"sync"
+	"tinychain/common"
 	"tinychain/db/leveldb"
 )
 
@@ -37,7 +37,7 @@ type MerkleNode struct {
 	Children   []common.Hash `json:"children"` // children hash, for locating in db
 	childNodes []*MerkleNode                   // cache node list
 	leaf       bool                            // Set true if is leaf
-	dirty      []bool
+	dirty      map[int]struct{}
 	lock       sync.RWMutex
 }
 
@@ -47,7 +47,7 @@ func NewMerkleNode(db *BmtDB, pos *Position, aggre int) *MerkleNode {
 		Pos:        pos,
 		Children:   make([]common.Hash, aggre),
 		childNodes: make([]*MerkleNode, aggre),
-		dirty:      make([]bool, aggre),
+		dirty:      make(map[int]struct{}),
 	}
 }
 
@@ -71,7 +71,7 @@ func (node *MerkleNode) computeHash() (common.Hash, error) {
 	var bytes []byte
 	for i, childHash := range node.Children {
 		var hash []byte
-		if node.dirty[i] {
+		if _, dirty := node.dirty[i]; dirty {
 			child := node.childNodes[i]
 			h, err := child.computeHash()
 			if err != nil {

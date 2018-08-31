@@ -1,20 +1,21 @@
 package core
 
 import (
-	"tinychain/core/types"
-	"tinychain/core/state"
 	"tinychain/common"
-	"tinychain/core/vm"
 	"tinychain/consensus"
+	"tinychain/core/chain"
+	"tinychain/core/state"
+	"tinychain/core/types"
+	"tinychain/core/vm/evm"
 )
 
 type StateProcessor struct {
-	bc      *Blockchain
+	bc      *chain.Blockchain
 	statedb *state.StateDB
 	engine  consensus.Engine
 }
 
-func NewStateProcessor(bc *Blockchain, statedb *state.StateDB, engine consensus.Engine) *StateProcessor {
+func NewStateProcessor(bc *chain.Blockchain, statedb *state.StateDB, engine consensus.Engine) *StateProcessor {
 	return &StateProcessor{
 		bc:      bc,
 		statedb: statedb,
@@ -43,12 +44,12 @@ func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 	return receipts, nil
 }
 
-func ApplyTransaction(bc *Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction) (*types.Receipt, uint64, error) {
+func ApplyTransaction(bc *chain.Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction) (*types.Receipt, uint64, error) {
 	// Create a new context to be used in the EVM environment
 	context := NewEVMContext(tx, header, bc, author)
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms
-	vmenv := vm.NewEVM(context, statedb, nil, nil)
+	vmenv := evm.NewEVM(context, statedb, nil, nil)
 	// Apply the tx to current state
 	_, gasUsed, failed, err := ApplyTx(vmenv, tx)
 	if err != nil {

@@ -1,14 +1,14 @@
 package chain
 
 import (
-	"tinychain/db"
-	"github.com/hashicorp/golang-lru"
-	"tinychain/core/types"
-	"tinychain/common"
-	"sync/atomic"
-	"sync"
 	"errors"
 	"fmt"
+	"github.com/hashicorp/golang-lru"
+	"sync"
+	"sync/atomic"
+	"tinychain/common"
+	"tinychain/core/types"
+	"tinychain/db"
 )
 
 var (
@@ -123,6 +123,18 @@ func (bc *Blockchain) LastFinalBlock() *types.Block {
 	block := bc.GetBlockByHash(hash)
 	bc.lastFinalBlock.Store(block)
 	return block
+}
+
+func (bc *Blockchain) GetHeader(hash common.Hash) *types.Header {
+	if header, ok := bc.headerCache.Get(hash); ok {
+		return header.(*types.Header)
+	}
+	blk := bc.GetBlockByHash(hash)
+	if blk == nil {
+		return nil
+	}
+	bc.headerCache.Add(hash, blk.Header)
+	return blk.Header
 }
 
 func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {

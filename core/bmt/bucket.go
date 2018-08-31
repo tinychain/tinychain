@@ -1,13 +1,13 @@
 package bmt
 
 import (
-	"tinychain/common"
-	"encoding/binary"
-	"sync"
-	json "github.com/json-iterator/go"
 	"bytes"
+	"encoding/binary"
 	"errors"
+	json "github.com/json-iterator/go"
 	"sort"
+	"sync"
+	"tinychain/common"
 	"tinychain/db/leveldb"
 )
 
@@ -86,7 +86,7 @@ type HashTable struct {
 	Cap        int           `json:"cap"`
 	BucketHash []common.Hash `json:"bucket_hash"`
 	buckets    []*Bucket
-	dirty      []bool
+	dirty      map[int]struct{}
 	lock       sync.RWMutex
 }
 
@@ -96,7 +96,7 @@ func NewHashTable(db *BmtDB, cap int) *HashTable {
 		Cap:        cap,
 		buckets:    make([]*Bucket, cap, cap),
 		BucketHash: make([]common.Hash, cap, cap),
-		dirty:      make([]bool, cap, cap),
+		dirty:      make(map[int]struct{}),
 	}
 }
 
@@ -119,9 +119,9 @@ func (ht *HashTable) deserialize(d []byte) error {
 	return json.Unmarshal(d, ht)
 }
 
-func (ht *HashTable) getIndex(key string) uint32 {
-	val := binary.BigEndian.Uint32([]byte(key))
-	return val % uint32(ht.Cap)
+func (ht *HashTable) getIndex(key string) int {
+	val := int(binary.BigEndian.Uint32([]byte(key)))
+	return val % ht.Cap
 }
 
 func (ht *HashTable) put(key string, value []byte) error {
@@ -153,7 +153,7 @@ func (ht *HashTable) put(key string, value []byte) error {
 			bucket.addKey(key)
 			bucket.Slots[key] = value
 		}
-		ht.dirty[index] = true
+		ht.dirty[index] = struct{}{}
 	}
 	return nil
 }
@@ -188,15 +188,13 @@ func (ht *HashTable) commit(batch *leveldb.Batch) error {
 	}
 	ht.lock.Lock()
 	defer ht.lock.Unlock()
-	for i, dirty := range ht.dirty {
-		if dirty {
-			bucket := ht.buckets[i]
-			err := ht.db.PutBucket(batch, bucket.Hash(), bucket)
-			if err != nil {
-				return err
-			}
+	for i := range ht.dirty {
+		delete(ht.dirty, i)
+		bucket := ht.buckets[i]
+		err := ht.db.PutBucket(batch, bucket.Hash(), bucket)
+		if err != nil {
+			return err
 		}
-		ht.dirty[i] = false
 	}
 	for i, bucket := range ht.buckets {
 		if bucket != nil {
@@ -208,4 +206,5 @@ func (ht *HashTable) commit(batch *leveldb.Batch) error {
 
 func (ht *HashTable) purge() {
 	ht.buckets = make([]*Bucket, ht.Cap, ht.Cap)
+	ht.dirty = make(map[int]struct{})
 }
