@@ -1,10 +1,11 @@
 package executor
 
 import (
-	"tinychain/core/types"
 	"errors"
-	"tinychain/core/state"
 	"tinychain/common"
+	"tinychain/core/chain"
+	"tinychain/core/state"
+	"tinychain/core/types"
 )
 
 var (
@@ -17,13 +18,13 @@ var (
 	errExtraDataOverflow   = errors.New("extra data is too long")
 )
 
-type BlockValidatorImpl struct {
+type BlockValidator struct {
 	maxExtraLength uint64
-	chain          Blockchain
+	chain          *chain.Blockchain
 }
 
-func NewBlockValidator(config *common.Config, chain Blockchain) *BlockValidatorImpl {
-	return &BlockValidatorImpl{
+func NewBlockValidator(config *common.Config, chain *chain.Blockchain) *BlockValidator {
+	return &BlockValidator{
 		maxExtraLength: uint64(config.GetInt64(common.MAX_EXTRA_LENGTH)),
 		chain:          chain,
 	}
@@ -35,7 +36,7 @@ func NewBlockValidator(config *common.Config, chain Blockchain) *BlockValidatorI
 // 3. Validate parentHash and height
 // 4. Validate extra data size is within bounds
 // 5. Validate transactions and tx root
-func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
+func (v *BlockValidator) ValidateHeader(block *types.Block) error {
 	//  TODO Check timestamp
 	parent := v.chain.GetBlockByHash(block.ParentHash())
 	if block.Time().Cmp(parent.Time()) <= 0 {
@@ -65,7 +66,7 @@ func (v *BlockValidatorImpl) ValidateHeader(block *types.Block) error {
 // Validate block txs
 // 1. Validate receipts root hash
 // 2. Validate state root
-func (v *BlockValidatorImpl) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error {
+func (v *BlockValidator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error {
 	receiptRoot := receipts.Hash()
 	if receiptRoot != block.ReceiptsHash() {
 		return errReceiptRootNotEqual

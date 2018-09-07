@@ -32,7 +32,7 @@ var (
 
 // Type implements the `Protocol` interface, and returns the message type of consensus engine
 func (eg *Engine) Type() string {
-	return common.CONSENSUS_MSG
+	return common.ConsensusMsg
 }
 
 // Run implements the `Protocol` interface, and handle the message received from p2p layer

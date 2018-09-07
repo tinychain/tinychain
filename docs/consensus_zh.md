@@ -77,3 +77,21 @@ Tinychain中的Proof-of-work是一个常规的工作量证明共识算法，灵�
 
 ### 所有类型节点
 - `core.CommitBlockEvent` - 通知`Executor`提交区块至数据库。
+
+# 共识引擎各组件的接口定义
+```Go
+type Blockchain interface {
+    // for demand
+    LastBlock() *types.Block
+    ...
+}
+
+type BlockValidator interface{
+    ValidateHeader(b *types.Block) error
+    ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
+}
+
+type TxValidator interface{
+	ValidateTx(transaction *types.Transaction) error
+}
+```

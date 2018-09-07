@@ -104,7 +104,7 @@ func (pl *peerPool) count() int {
 }
 
 func (pl *peerPool) Type() string {
-	return common.CONSENSUS_PEER_MSG
+	return common.ConsensusPeerMsg
 }
 
 func (pl *peerPool) Run(pid peer.ID, message *pb.Message) error {
@@ -141,7 +141,7 @@ func (pl *peerPool) Run(pid peer.ID, message *pb.Message) error {
 		}
 		go pl.event.Post(&p2p.SendMsgEvent{
 			Target: peer.ID(peerMsg.Id),
-			Typ:    common.CONSENSUS_PEER_MSG,
+			Typ:    common.ConsensusPeerMsg,
 			Data:   data,
 		})
 	}

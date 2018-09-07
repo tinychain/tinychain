@@ -1,18 +1,17 @@
 package solo
 
 import (
-	"tinychain/core/types"
-	"tinychain/common"
-	"tinychain/core/state"
 	"github.com/libp2p/go-libp2p-crypto"
-	"tinychain/consensus/blockpool"
-	"tinychain/event"
-	"tinychain/core"
-	"tinychain/p2p"
-	"tinychain/core/executor"
-	"tinychain/core/txpool"
-	"time"
 	"math/big"
+	"time"
+	"tinychain/common"
+	"tinychain/consensus/blockpool"
+	"tinychain/core"
+	"tinychain/core/state"
+	"tinychain/core/txpool"
+	"tinychain/core/types"
+	"tinychain/event"
+	"tinychain/p2p"
 )
 
 var (
@@ -29,10 +28,19 @@ type Blockchain interface {
 	LastBlock() *types.Block
 }
 
+type BlockValidator interface {
+	ValidateHeader(b *types.Block) error
+	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
+}
+
+type TxValidator interface {
+	ValidateTx(transaction *types.Transaction) error
+}
+
 type SoloEngine struct {
 	config    *Config
 	chain     Blockchain
-	validator executor.BlockValidator
+	validator BlockValidator
 	blockPool *blockpool.BlockPool
 	txPool    *txpool.TxPool
 	state     *state.StateDB
@@ -51,16 +59,15 @@ type SoloEngine struct {
 	commitSub    event.Subscription // listen for the commit block completed from executor
 }
 
-func NewSoloEngine(config *common.Config, state *state.StateDB, chain Blockchain, validator executor.BlockValidator) (*SoloEngine, error) {
+func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator BlockValidator, txValidator TxValidator) (*SoloEngine, error) {
 	conf := newConfig(config)
 	soloEngine := &SoloEngine{
 		config:    conf,
 		event:     event.GetEventhub(),
 		chain:     chain,
-		blockPool: blockpool.NewBlockPool(config, validator, nil, log, common.PROPOSE_BLOCK_MSG),
+		blockPool: blockpool.NewBlockPool(config, blValidator, nil, log, common.ProposeBlockMsg),
 	}
 
-	txValidator := executor.NewTxValidator(executor.NewConfig(config), state)
 	if conf.BP {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
 		if err != nil {
@@ -172,7 +179,7 @@ func (solo *SoloEngine) broadcast(block *types.Block) error {
 		return err
 	}
 	go solo.event.Post(&p2p.BroadcastEvent{
-		Typ:  common.PROPOSE_BLOCK_MSG,
+		Typ:  common.ProposeBlockMsg,
 		Data: data,
 	})
 	return nil

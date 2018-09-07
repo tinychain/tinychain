@@ -1,15 +1,14 @@
 package tiny
 
 import (
-	"tinychain/event"
-	"tinychain/consensus"
-	"tinychain/core"
-	"tinychain/db"
 	"tinychain/common"
-	"tinychain/core/executor"
-	"tinychain/db/leveldb"
-	"tinychain/core/state"
+	"tinychain/consensus"
 	"tinychain/core/chain"
+	"tinychain/core/executor"
+	"tinychain/core/state"
+	"tinychain/db"
+	"tinychain/db/leveldb"
+	"tinychain/event"
 )
 
 var (
@@ -18,7 +17,7 @@ var (
 
 // Tiny implements the tinychain full node service
 type Tiny struct {
-	config *Config
+	config *common.Config
 
 	eventHub *event.TypeMux
 
@@ -30,14 +29,12 @@ type Tiny struct {
 
 	state *state.StateDB
 
-	network Network
+	network *Network
 
 	executor executor.Executor
-
-	pm *ProtocolManager
 }
 
-func New(config *Config) (*Tiny, error) {
+func New(config *common.Config) (*Tiny, error) {
 	eventHub := event.GetEventhub()
 
 	ldb, err := leveldb.NewLDBDataBase("tinychain")
@@ -54,10 +51,10 @@ func New(config *Config) (*Tiny, error) {
 		return nil, err
 	}
 
-	network := NewNetwork(config.p2p)
+	network := NewNetwork(config)
 	engine := consensus.New()
 
-	bc, err := core.NewBlockchain(tinyDB, engine)
+	bc, err := chain.NewBlockchain(ldb)
 	if err != nil {
 		log.Error("Failed to create blockchain")
 		return nil, err
@@ -71,18 +68,22 @@ func New(config *Config) (*Tiny, error) {
 		chain:    bc,
 		engine:   engine,
 		state:    statedb,
-		pm:       NewProtocolManager(network),
 	}, nil
 }
 
-func (chain *Tiny) Start() error {
+func (tiny *Tiny) Start() error {
 	// Collect protocols and register in the protocol manager
 
 	// start network
-	err := chain.network.Start()
+	tiny.network.Start()
+
 }
 
-func (chain *Tiny) Stop() {
-	chain.eventHub.Stop()
-	chain.network.Stop()
+func (tiny *Tiny) init() error {
+
+}
+
+func (tiny *Tiny) Close() {
+	tiny.eventHub.Stop()
+	tiny.network.Stop()
 }

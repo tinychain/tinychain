@@ -1,18 +1,18 @@
 package p2p
 
 import (
-	"github.com/libp2p/go-libp2p-peerstore"
-	"github.com/libp2p/go-libp2p-kbucket"
-	"time"
-	"github.com/libp2p/go-libp2p-peer"
-	ma "github.com/multiformats/go-multiaddr"
-	"tinychain/p2p/pb"
-	"fmt"
-	"os"
 	"bufio"
+	"fmt"
+	"github.com/libp2p/go-libp2p-kbucket"
+	"github.com/libp2p/go-libp2p-peer"
+	"github.com/libp2p/go-libp2p-peerstore"
+	ma "github.com/multiformats/go-multiaddr"
+	"os"
 	"strings"
 	"sync"
+	"time"
 	"tinychain/common"
+	"tinychain/p2p/pb"
 )
 
 var (
@@ -20,18 +20,16 @@ var (
 )
 
 const (
-	BUCKET_SIZE        = 16
-	LOOP_TIME_PER_SYNC = 8
+	bucketSize      = 16
+	loopTimePerSync = 8
 )
 
 type RouteTable struct {
 	peer          *Peer // Local peer
 	peerStore     peerstore.Peerstore
-	routeTable    *kbucket.RoutingTable
-	routeFilePath string // Route table cache file
-
-	// Seed peers for bootstrap
-	seeds []ma.Multiaddr
+	routeTable    *kbucket.RoutingTable // k-bucket route table
+	routeFilePath string                // Route table cache file
+	seeds         []ma.Multiaddr        // Seed peers for bootstrap
 
 	maxPeersCountForSync int
 	quitCh               chan struct{}
@@ -45,13 +43,13 @@ func NewRouteTable(config *Config, peer *Peer) *RouteTable {
 		peer:      peer,
 		peerStore: peer.host.Peerstore(),
 		routeTable: kbucket.NewRoutingTable(
-			BUCKET_SIZE,
+			bucketSize,
 			kbucket.ConvertPeerID(localId),
 			time.Second*30,
 			pstore,
 		),
 		seeds:                config.seeds,
-		maxPeersCountForSync: BUCKET_SIZE,
+		maxPeersCountForSync: bucketSize,
 		routeFilePath:        config.routeFilePath,
 	}
 	//table.routeTable.Update(localId)
@@ -138,7 +136,7 @@ func (table *RouteTable) AddIPFSPeer(addr ma.Multiaddr) error {
 	return nil
 }
 
-// Add peers when get 'ROUTESYNC_RESP'
+// Add peers when get 'RouteSyncResp'
 func (table *RouteTable) AddPeers(peers []*pb.PeerInfo) error {
 	//if len(peers) > table.maxPeersCountForSync {
 	//	//TODO select first maxPeersCount
@@ -182,7 +180,7 @@ func (table *RouteTable) SyncRouteFromNeighbor() {
 	syncedPeers := make(map[peer.ID]bool)
 	var wg sync.WaitGroup
 
-	loopTime := LOOP_TIME_PER_SYNC
+	loopTime := loopTimePerSync
 	for loopTime > 0 {
 		loopTime -= 1
 
@@ -223,7 +221,7 @@ func (table *RouteTable) SyncRouteFromNeighbor() {
 }
 
 // Sync route table with a peer
-// It send `ROUTESYNC_REQ` message and transfer nil data
+// It send `RouteSyncReq` message and transfer nil data
 func (table *RouteTable) SyncFromPeer(pid peer.ID) error {
 	if pid == table.peer.ID() {
 		return nil
@@ -231,9 +229,10 @@ func (table *RouteTable) SyncFromPeer(pid peer.ID) error {
 	//stream := table.peer.Streams.Find(pid)
 	//if stream == nil {
 	stream := NewStreamWithPid(pid, table.peer)
+
 	//}
 
-	return stream.send(common.ROUTESYNC_REQ, nil)
+	return stream.send(common.RouteSyncReq, nil)
 }
 
 // Start sync route table looping

@@ -77,3 +77,21 @@ Some event types used by consensus engine are introduced below(can be more):
 
 ### Both
 - `core.CommitBlockEvent` - notify `Executor` to commit blocks to database.
+
+# Interface of components in consensus engine
+```Go
+type Blockchain interface {
+    // for demand
+    LastBlock() *types.Block
+    ...
+}
+
+type BlockValidator interface{
+    ValidateHeader(b *types.Block) error
+    ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
+}
+
+type TxValidator interface{
+	ValidateTx(transaction *types.Transaction) error
+}
+```

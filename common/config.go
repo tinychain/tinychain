@@ -1,9 +1,9 @@
 package common
 
 import (
+	"fmt"
 	"github.com/spf13/viper"
 	"sync"
-	"fmt"
 	"time"
 )
 
@@ -64,4 +64,10 @@ func (c *Config) GetDuration(key string) time.Duration {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.conf.GetDuration(key)
+}
+
+func (c *Config) GetSlice(key string) []string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.conf.GetStringSlice(key)
 }

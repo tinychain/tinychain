@@ -85,7 +85,7 @@ func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.
 		state:            state,
 		event:            event.GetEventhub(),
 		validator:        validator,
-		blockPool:        blockpool.NewBlockPool(config, validator, log, common.PROPOSE_BLOCK_MSG),
+		blockPool:        blockpool.NewBlockPool(config, validator, log, common.ProposeBlockMsg),
 		execCompleteChan: make(chan struct{}),
 		quitCh:           make(chan struct{}),
 	}
@@ -267,7 +267,7 @@ func (eg *Engine) multicast(block *types.Block) error {
 	}
 	go eg.event.Post(&p2p.MulticastEvent{
 		Targets: pids,
-		Typ:     common.PROPOSE_BLOCK_MSG,
+		Typ:     common.ProposeBlockMsg,
 		Data:    data,
 	})
 	eg.bftState.Store(PRE_COMMIT)
@@ -280,7 +280,7 @@ func (eg *Engine) broadcast(block *types.Block) error {
 		return err
 	}
 	go eg.event.Post(&p2p.BroadcastEvent{
-		Typ:  common.PROPOSE_BLOCK_MSG,
+		Typ:  common.ProposeBlockMsg,
 		Data: data,
 	})
 	return nil

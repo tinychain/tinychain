@@ -116,7 +116,7 @@ func (tp *TxPool) broadcast(batch []interface{}) {
 		return
 	}
 	go tp.event.Post(&p2p.BroadcastEvent{
-		Typ:  common.NEW_TX_MSG,
+		Typ:  common.NewTxMsg,
 		Data: data,
 	})
 }
@@ -318,7 +318,7 @@ func (tp *TxPool) postBatch(txs types.Transactions) {
 }
 
 func (tp *TxPool) Type() string {
-	return common.NEW_TX_MSG
+	return common.NewTxMsg
 }
 
 func (tp *TxPool) Run(id peer.ID, message *pb.Message) error {

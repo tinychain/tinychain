@@ -2,27 +2,29 @@ package p2p
 
 import (
 	"context"
-	"github.com/libp2p/go-libp2p-peer"
-	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
-	libnet "github.com/libp2p/go-libp2p-net"
-	ma "github.com/multiformats/go-multiaddr"
-	pstore "github.com/libp2p/go-libp2p-peerstore"
-	"time"
-	"github.com/pkg/errors"
-	"tinychain/common"
-	"github.com/libp2p/go-libp2p-protocol"
-	"fmt"
 	"crypto/rand"
+	"fmt"
+	"github.com/hashicorp/golang-lru"
 	"github.com/libp2p/go-libp2p-crypto"
+	libnet "github.com/libp2p/go-libp2p-net"
+	"github.com/libp2p/go-libp2p-peer"
+	pstore "github.com/libp2p/go-libp2p-peerstore"
+	"github.com/libp2p/go-libp2p-protocol"
 	"github.com/libp2p/go-libp2p-swarm"
+	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
+	ma "github.com/multiformats/go-multiaddr"
+	"github.com/pkg/errors"
 	"sync"
+	"time"
+	"tinychain/common"
 	"tinychain/event"
 )
 
 const (
 	MaxRespBufSize  = 100
 	MaxNearestPeers = 20
-	DEFAULT_TIMEOUT = time.Second * 60
+	MaxStreamNum    = 1000
+	DefaultTimeout  = time.Second * 60
 )
 
 var (
@@ -93,22 +95,25 @@ func newHost(port int, privKey crypto.PrivKey) (*bhost.BasicHost, error) {
 
 // Peer stands for a logical peer of tinychain's p2p layer
 type Peer struct {
+	context    context.Context
 	mux        *event.TypeMux
 	host       *bhost.BasicHost // Local peer host
 	routeTable *RouteTable      // Local route table
-	context    context.Context
-	respCh     chan *innerMsg // Response channel. Receive message from stream.
-	quitCh     chan struct{}  // quit channel
-	protocols  sync.Map       // Handlers of upper layer. map[string][]*Protocol
-	timeout    time.Duration  // Timeout of per connection
-	ready      chan struct{}  // Physical network is ready or not
+	protocols  sync.Map         // Handlers of upper layer. map[string][]*Protocol
+	timeout    time.Duration    // Timeout of per connection
+	streamPool *lru.Cache       // pool of live stream
+
+	respCh chan *innerMsg // Response channel. Receive message from stream.
+	quitCh chan struct{}  // quit channel
+	ready  chan struct{}  // Physical network is ready or not
 }
 
 // Creates new peer struct
-func New(config *Config) (*Peer, error) {
-	host, err := newHost(config.port, config.privKey)
+func New(config *common.Config) (*Peer, error) {
+	conf := newConfig(config)
+	host, err := newHost(conf.port, conf.privKey)
 	if err != nil {
-		log.Errorf("Cannot create host: %s", err)
+		log.Errorf("failed to create host, %s", err)
 		return nil, err
 	}
 
@@ -117,10 +122,18 @@ func New(config *Config) (*Peer, error) {
 		context: context.Background(),
 		respCh:  make(chan *innerMsg, MaxRespBufSize),
 		quitCh:  make(chan struct{}),
-		timeout: DEFAULT_TIMEOUT,
+		timeout: DefaultTimeout,
 		mux:     event.GetEventhub(),
 	}
-	peer.routeTable = NewRouteTable(config, peer)
+	peer.routeTable = NewRouteTable(conf, peer)
+	streamPool, err := lru.NewWithEvict(MaxStreamNum, func(key interface{}, value interface{}) {
+		value.(*Stream).close(nil)
+	})
+	if err != nil {
+		log.Errorf("failed to init stream pool, %s", err)
+		return nil, err
+	}
+	peer.streamPool = streamPool
 
 	return peer, nil
 }
@@ -129,10 +142,15 @@ func (peer *Peer) ID() peer.ID {
 	return peer.host.ID()
 }
 
-// Link to a unknown peer with its multiaddr
+// Link to a unknown peer with its ipfs multiaddr
 // and send handshake
-func (peer *Peer) Link(addr ma.Multiaddr) {
+func (peer *Peer) ConnectWithIPFS(addr ma.Multiaddr) error {
 	// TODO
+	pid, _, err := ParseFromIPFSAddr(addr)
+	if err != nil {
+		return err
+	}
+	return peer.Connect(pid)
 }
 
 // Connect to a peer
@@ -152,13 +170,9 @@ func (peer *Peer) Send(pid peer.ID, typ string, data []byte) error {
 	if pid == peer.ID() {
 		return ErrSendToSelf
 	}
-	err := peer.Connect(pid)
-	if err != nil {
-		return err
-	}
+
 	stream := NewStreamWithPid(pid, peer)
-	//peer.Streams.AddStream(stream)
-	err = stream.send(typ, data)
+	err := stream.send(typ, data)
 	if err != nil {
 		return err
 	}
@@ -174,7 +188,7 @@ func (peer *Peer) Start() {
 	// Sync route with seeds and neighbor
 	peer.routeTable.Start()
 
-	go peer.ListenMsg()
+	go peer.listenMsg()
 }
 
 func (peer *Peer) Stop() {
@@ -183,11 +197,11 @@ func (peer *Peer) Stop() {
 		peer.host.Close()
 	}
 	peer.routeTable.Stop()
-	peer.quitCh <- struct{}{}
+	close(peer.quitCh)
 	log.Info("Peer stopped successfully.")
 }
 
-func (peer *Peer) ListenMsg() {
+func (peer *Peer) listenMsg() {
 	for {
 		select {
 		case inner := <-peer.respCh:
@@ -217,10 +231,13 @@ func (peer *Peer) Broadcast(pbName string, data []byte) {
 		if pid == peer.ID() {
 			continue
 		}
-		err := peer.Send(pid, pbName, data)
-		if err != nil {
-			log.Errorf("failed to send %s msg to peer %s, %s", pbName, pid.Pretty(), err)
-		}
+		go func() {
+			err := peer.Send(pid, pbName, data)
+			if err != nil {
+				log.Errorf("failed to send %s msg to peer %s, %s", pbName, pid.Pretty(), err)
+			}
+			peer.routeTable.update(pid)
+		}()
 	}
 }
 
@@ -230,11 +247,13 @@ func (peer *Peer) Multicast(pids []peer.ID, pbName string, data []byte) {
 		if pid == peer.ID() {
 			continue
 		}
-		err := peer.Send(pid, pbName, data)
-		if err != nil {
-			log.Errorf("failed to send %s msg to peer %s, %s", pbName, pid.Pretty(), err)
-		}
-		// move the active pid up ahead of the route bucket
-		go peer.routeTable.update(pid)
+		go func() {
+			err := peer.Send(pid, pbName, data)
+			if err != nil {
+				log.Errorf("failed to send %s msg to peer %s, %s", pbName, pid.Pretty(), err)
+			}
+			// move the active pid up ahead of the route bucket
+			peer.routeTable.update(pid)
+		}()
 	}
 }

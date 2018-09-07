@@ -1,16 +1,16 @@
 package p2p
 
 import (
+	"fmt"
+	libnet "github.com/libp2p/go-libp2p-net"
 	"github.com/libp2p/go-libp2p-peer"
 	ma "github.com/multiformats/go-multiaddr"
-	libnet "github.com/libp2p/go-libp2p-net"
-	"fmt"
 
-	"tinychain/p2p/pb"
 	"errors"
-	"time"
 	"github.com/golang/protobuf/proto"
+	"time"
 	"tinychain/common"
+	"tinychain/p2p/pb"
 )
 
 var (
@@ -24,7 +24,7 @@ var (
 
 // innerMsg transfer the response message to protocols through channel
 type innerMsg struct {
-	pid peer.ID    // remote peer id
+	pid peer.ID     // remote peer id
 	msg *pb.Message // message received from remote peer
 }
 
@@ -33,7 +33,6 @@ type Stream struct {
 	remoteAddr ma.Multiaddr  // Remote peer multiaddr
 	stream     libnet.Stream // Stream between peer and remote peer
 	peer       *Peer         // Local peer
-	//handshake  bool          // Id handshake successful or not
 
 	//handshakeSuccessCh chan struct{} // Channel when handshake successfully
 	pbChan      chan *pb.Message // Channel for message transfering
@@ -41,16 +40,20 @@ type Stream struct {
 }
 
 func NewStreamWithPid(pid peer.ID, peer *Peer) *Stream {
-	return NewStream(pid, nil, nil, peer)
+	if val, ok := peer.streamPool.Get(pid); ok {
+		return val.(*Stream)
+	}
+	stream := NewStream(pid, nil, nil, peer)
+	peer.streamPool.Add(pid, stream)
+	return stream
 }
 
 func NewStream(pid peer.ID, addr ma.Multiaddr, stream libnet.Stream, peer *Peer) *Stream {
 	return &Stream{
-		remoteId:   pid,
-		remoteAddr: addr,
-		stream:     stream,
-		peer:       peer,
-		//handshake:   false,
+		remoteId:    pid,
+		remoteAddr:  addr,
+		stream:      stream,
+		peer:        peer,
 		pbChan:      make(chan *pb.Message, 2*1024),
 		quitWriteCh: make(chan struct{}, 1),
 	}
@@ -64,22 +67,17 @@ func (s *Stream) connect() error {
 		TransProtocol,
 	)
 	if err != nil {
-		//log.Infof("Failed to connect remote peer %s:%s\n", s.remoteId.Pretty(), err)
+		log.Errorf("Failed to connect remote peer %s, error: %s\n", s.remoteId.Pretty(), err)
 		return err
 	}
 	s.stream = stream
 	s.remoteAddr = stream.Conn().RemoteMultiaddr()
-	//log.Infof("Connect to Peer. Info: %s\n", s.remoteAddr)
+	log.Infof("Connect to Peer. Info: %s\n", s.remoteAddr)
 
 	s.start()
 
 	return nil
 }
-
-// Check is handshake successful or not
-//func (s *Stream) Handshake() bool {
-//	return s.handshake
-//}
 
 func (s *Stream) String() string {
 	addrStr := ""
@@ -89,7 +87,7 @@ func (s *Stream) String() string {
 	return fmt.Sprintf("Peer Stream:%s,%s\n", s.remoteId.Pretty(), addrStr)
 }
 
-func (s *Stream) Close(reason error) {
+func (s *Stream) close(reason error) {
 	//log.Info("Closing stream.")
 
 	// Clean up
@@ -126,11 +124,15 @@ func (s *Stream) send(typ string, data []byte) error {
 
 	// Write data to stream
 	seri, _ := message.Serialize()
-	_, err = s.stream.Write(seri)
-	if err != nil {
-		log.Infof("Failed to send message to peer %s. Message name:%s",
-			s.remoteAddr, message.Name)
-		return err
+	var sended int
+	for sended < len(seri) {
+		n, err := s.stream.Write(seri)
+		if err != nil {
+			log.Infof("Failed to send message to peer %s. Message name:%s",
+				s.remoteAddr, message.Name)
+			return err
+		}
+		sended += n
 	}
 	return nil
 }
@@ -140,11 +142,11 @@ func (s *Stream) SetReadDeadline(name string) {
 		return
 	}
 	switch name {
-	case common.ROUTESYNC_REQ:
+	case common.RouteSyncReq:
 		fallthrough
-	case common.ROUTESYNC_RESP:
+	case common.RouteSyncResp:
 		s.stream.SetReadDeadline(time.Now().Add(routeSyncTimeout))
-	case common.OK_MSG:
+	case common.OkMsg:
 		s.stream.SetReadDeadline(time.Now().Add(okTimeout))
 	default:
 		s.stream.SetReadDeadline(time.Now().Add(normalTimeout))
@@ -166,7 +168,7 @@ func (s *Stream) SetReadDeadline(name string) {
 func (s *Stream) readLoop() {
 	if s.stream == nil {
 		if err := s.connect(); err != nil {
-			s.Close(err)
+			s.close(err)
 			return
 		}
 	}
@@ -181,8 +183,8 @@ func (s *Stream) readLoop() {
 	for {
 		n, err := s.stream.Read(buf)
 		if err != nil {
-			s.Close(err)
-			//log.Infof("Stream Close. %s.\n", err)
+			s.close(err)
+			//log.Infof("Stream close. %s.\n", err)
 			return
 		}
 		msgBuf = append(msgBuf, buf[:n]...)
@@ -244,14 +246,14 @@ func (s *Stream) handleMsg(message *pb.Message) error {
 	pbName := message.Name
 	log.Infof("Peer %s receive pb `%s`\n", s.peer.ID(), pbName)
 	switch pbName {
-	case common.OK_MSG:
+	case common.OkMsg:
 		// success response
-		s.Close(nil)
-	case common.ROUTESYNC_REQ:
+		s.close(nil)
+	case common.RouteSyncReq:
 		// A peer wants your route table
 		return s.onSyncRoute()
-	case common.ROUTESYNC_RESP:
-		s.Close(nil)
+	case common.RouteSyncResp:
+		s.close(nil)
 		// Update local route table
 		return s.syncRoute(message.Data)
 	default:
@@ -261,7 +263,7 @@ func (s *Stream) handleMsg(message *pb.Message) error {
 			pid: s.stream.Conn().RemotePeer(),
 			msg: message,
 		}
-		s.Close(nil)
+		s.close(nil)
 	}
 	return nil
 }
@@ -288,10 +290,10 @@ func (s *Stream) onSyncRoute() error {
 	if err != nil {
 		return err
 	}
-	return s.send(common.ROUTESYNC_RESP, data)
+	return s.send(common.RouteSyncResp, data)
 }
 
-// Receive `ROUTESYNC_RESP` and Update local route table
+// Receive `RouteSyncResp` and Update local route table
 func (s *Stream) syncRoute(data []byte) error {
 	peerData := &pb.PeerData{}
 	err := proto.Unmarshal(data, peerData)

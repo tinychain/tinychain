@@ -13,19 +13,19 @@ var (
 	ErrInvalidSender = errors.New("invalid sender")
 )
 
-type TxValidatorImpl struct {
+type TxValidator struct {
 	config *Config
 	state  *state.StateDB
 }
 
-func NewTxValidator(config *Config, state *state.StateDB) TxValidator {
-	return &TxValidatorImpl{
+func NewTxValidator(config *Config, state *state.StateDB) *TxValidator {
+	return &TxValidator{
 		config: config,
 		state:  state,
 	}
 }
 
-func (v *TxValidatorImpl) ValidateTxs(txs types.Transactions) (valid types.Transactions, invalid types.Transactions) {
+func (v *TxValidator) ValidateTxs(txs types.Transactions) (valid types.Transactions, invalid types.Transactions) {
 	for _, tx := range txs {
 		if err := v.ValidateTx(tx); err != nil {
 			invalid = append(invalid, tx)
@@ -44,7 +44,7 @@ func (v *TxValidatorImpl) ValidateTxs(txs types.Transactions) (valid types.Trans
 // 5. check signature
 // 6. check nonce
 // 7. check balance is enough or not for tx.Cost()
-func (v *TxValidatorImpl) ValidateTx(tx *types.Transaction) error {
+func (v *TxValidator) ValidateTx(tx *types.Transaction) error {
 	if tx.Size() > types.MaxTxSize {
 		return ErrTxTooLarge
 	}

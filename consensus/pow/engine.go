@@ -1,24 +1,23 @@
 package pow
 
 import (
-	"tinychain/common"
+	"encoding/json"
+	"fmt"
+	"github.com/libp2p/go-libp2p-crypto"
 	"math"
+	"math/big"
 	"runtime"
+	"sync"
+	"sync/atomic"
+	"time"
+	"tinychain/common"
+	"tinychain/consensus/blockpool"
+	"tinychain/core"
+	"tinychain/core/state"
+	"tinychain/core/txpool"
 	"tinychain/core/types"
 	"tinychain/event"
-	"tinychain/core"
-	"encoding/json"
-	"sync"
-	"tinychain/core/state"
-	"github.com/libp2p/go-libp2p-crypto"
 	"tinychain/p2p"
-	"math/big"
-	"time"
-	"tinychain/consensus/blockpool"
-	"tinychain/core/executor"
-	"tinychain/core/txpool"
-	"sync/atomic"
-	"fmt"
 )
 
 var (
@@ -38,6 +37,15 @@ type Blockchain interface {
 	GetBlockByHash(hash common.Hash) *types.Block
 }
 
+type BlockValidator interface {
+	ValidateHeader(b *types.Block) error
+	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
+}
+
+type TxValidator interface {
+	ValidateTx(transaction *types.Transaction) error
+}
+
 type consensusInfo struct {
 	Difficulty uint64 `json:"Difficulty"` // difficulty target bits for mining
 	Nonce      uint64 `json:"nonce"`      // computed result
@@ -55,10 +63,10 @@ type ProofOfWork struct {
 	state            *state.StateDB
 	blockPool        *blockpool.BlockPool
 	txPool           *txpool.TxPool
-	blValidator      executor.BlockValidator // block validator
-	csValidator      *csValidator            // consensus validator
-	blockNum         uint64                  // new block num at certain difficulty period
-	currMiningHeader *types.Header           // block header that being mined currently
+	blValidator      BlockValidator // block validator
+	csValidator      *csValidator   // consensus validator
+	blockNum         uint64         // new block num at certain difficulty period
+	currMiningHeader *types.Header  // block header that being mined currently
 
 	address common.Address
 	privKey crypto.PrivKey
@@ -77,7 +85,7 @@ type ProofOfWork struct {
 	receiptsSub  event.Subscription // listen for the receipts executed by executor
 }
 
-func New(config *common.Config, chain Blockchain, state *state.StateDB, validator executor.BlockValidator) (*ProofOfWork, error) {
+func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator BlockValidator, txValidator TxValidator) (*ProofOfWork, error) {
 	conf := newConfig(config)
 
 	csValidator := newCsValidator(chain)
@@ -86,14 +94,13 @@ func New(config *common.Config, chain Blockchain, state *state.StateDB, validato
 		config:      conf,
 		chain:       chain,
 		state:       state,
-		blValidator: validator,
+		blValidator: blValidator,
 		csValidator: csValidator,
 		event:       event.GetEventhub(),
 		quitCh:      make(chan struct{}),
-		blockPool:   blockpool.NewBlockPool(config, validator, csValidator, log, common.PROPOSE_BLOCK_MSG),
+		blockPool:   blockpool.NewBlockPool(config, blValidator, csValidator, log, common.ProposeBlockMsg),
 	}
 
-	txValidator := executor.NewTxValidator(executor.NewConfig(config), state)
 	// if is miner node
 	if conf.Miner {
 		privKey, err := crypto.UnmarshalPrivateKey(conf.PrivKey)
@@ -298,7 +305,7 @@ func (pow *ProofOfWork) broadcast(block *types.Block) error {
 	}
 
 	go pow.event.Post(&p2p.BroadcastEvent{
-		Typ:  common.PROPOSE_BLOCK_MSG,
+		Typ:  common.ProposeBlockMsg,
 		Data: data,
 	})
 	return nil

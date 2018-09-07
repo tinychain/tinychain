@@ -2,14 +2,20 @@ package common
 
 const (
 	// P2P Message Type
-	OK_MSG         = "ok_msg"
-	ROUTESYNC_REQ  = "routesync_req"
-	ROUTESYNC_RESP = "routesync_resp"
+	OkMsg         = "OkMsg"
+	RouteSyncReq  = "RouteSyncReq"
+	RouteSyncResp = "RouteSyncResp"
 
-	CONSENSUS_MSG      = "consensus_msg"
-	CONSENSUS_PEER_MSG = "consensus_peer_msg"
-	PROPOSE_BLOCK_MSG  = "propose_block_msg"
-	READY_BLOCK_MSG    = "ready_block_msg"
+	ConsensusMsg     = "ConsensusMsg"
+	ConsensusPeerMsg = "ConsensusPeerMsg"
+	ProposeBlockMsg  = "ProposeBlockMsg"
+	ReadyBlockMsg    = "ReadyBlockMsg"
 
-	NEW_TX_MSG = "new_tx_msg"
+	NewTxMsg = "NewTxMsg"
+
+	// Consensus Type
+	SoloEngine    = "solo"
+	PowEngine     = "pow"
+	VrfBftEngine  = "vrf_bft"
+	DposBftEngine = "dpos_bft"
 )

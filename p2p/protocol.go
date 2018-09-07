@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	ErrDupHandler = errors.New("p2p handler duplicate")
+	errDupHandler = errors.New("p2p handler duplicate")
 )
 
 // Protocol represents the callback handler
@@ -27,7 +27,7 @@ func (p *Peer) AddProtocol(proto Protocol) error {
 		protocols := protocols.([]Protocol)
 		for _, protocol := range protocols {
 			if protocol == proto {
-				return ErrDupHandler
+				return errDupHandler
 			}
 		}
 		protocols = append(protocols, proto)
