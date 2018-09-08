@@ -1,23 +1,21 @@
 package executor
 
 import (
+	"fmt"
+	batcher "github.com/yyh1102/go-batcher"
+	"sync"
+	"sync/atomic"
+	"tinychain/common"
+	"tinychain/consensus"
 	"tinychain/core"
-	"tinychain/event"
+	"tinychain/core/chain"
 	"tinychain/core/state"
 	"tinychain/core/types"
-	batcher "github.com/yyh1102/go-batcher"
-	"tinychain/common"
-	"errors"
-	"tinychain/consensus"
-	"sync/atomic"
 	"tinychain/db"
-	"sync"
-	"tinychain/core/chain"
+	"tinychain/event"
 )
 
 var (
-	ErrBlockFallbehind = errors.New("block falls behind the current chain")
-
 	log = common.GetLogger("executor")
 )
 
@@ -74,7 +72,7 @@ func (ex *Executor) Init() error {
 		return err
 	}
 	ex.state = statedb
-	ex.processor = NewStateProcessor(ex.chain, statedb, ex.engine)
+	ex.processor = NewStateProcessor(ex.conf, ex.chain, statedb, ex.engine)
 	return nil
 }
 
@@ -95,7 +93,7 @@ func (ex *Executor) listen() {
 			go ex.proposeBlock(block)
 		case ev := <-ex.execBlockSub.Chan():
 			block := ev.(*core.ExecBlockEvent).Block
-			go ex.processBlock(block)
+			go ex.applyBlock(block)
 		case ev := <-ex.commitSub.Chan():
 			block := ev.(*core.CommitBlockEvent).Block
 			go ex.commit(block)
@@ -146,13 +144,12 @@ func (ex *Executor) processState() int {
 //	return nil
 //}
 
-// processBlock process the validation and execution of a received block from other peers
-func (ex *Executor) processBlock(block *types.Block) error {
-
-	if block.Height() < ex.chain.LastBlock().Height() {
-		return ErrBlockFallbehind
+// applyBlockBlock process the validation and execute the received block.
+func (ex *Executor) applyBlock(block *types.Block) error {
+	if currHeight := ex.chain.LastBlock().Height(); block.Height() != currHeight+1 {
+		return fmt.Errorf("block height is not match, demand #%d, got #%d", currHeight+1, block.Height())
 	}
-
+	ex.state.UpdateCurrHeight(block.Height())
 	receipts, err := ex.execBlock(block)
 	if err != nil {
 		log.Errorf("failed to execute block #%d, err:%s", block.Height(), err)
@@ -179,6 +176,7 @@ func (ex *Executor) processBlock(block *types.Block) error {
 // proposeBlock executes new transactions from tx_pool and pack a new block.
 // The new block is created by consensus engine and does not include state_root, tx_root and receipts_root.
 func (ex *Executor) proposeBlock(block *types.Block) error {
+	ex.state.UpdateCurrHeight(block.Height())
 	receipts, err := ex.execBlock(block)
 	if err != nil {
 		log.Errorf("failed to exec block #%d, err:%s", block.Height(), err)

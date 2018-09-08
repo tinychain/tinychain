@@ -5,9 +5,11 @@ Copyright (C) 2017 The HyperDCDN Authors.
 package common
 
 import (
-	"encoding/hex"
+	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
+	"math/big"
 )
 
 const (
@@ -16,6 +18,14 @@ const (
 )
 
 type Hash [HashLength]byte
+
+// BigToHash sets byte representation of b to hash.
+// If b is larger than len(h), b will be cropped from the left.
+func BigToHash(b *big.Int) Hash { return BytesToHash(b.Bytes()) }
+
+// HexToHash sets byte representation of s to hash.
+// If b is larger than len(h), b will be cropped from the left.
+func HexToHash(s string) Hash { return BytesToHash(FromHex(s)) }
 
 func (h Hash) String() string {
 	return string(h[:])
@@ -27,6 +37,10 @@ func (h Hash) Bytes() []byte {
 
 func (h Hash) Hex() []byte {
 	return Hex(h[:])
+}
+
+func (h Hash) Big() *big.Int {
+	return new(big.Int).SetBytes(h.Bytes())
 }
 
 // Decode hash string with "0x...." format to Hash type
@@ -66,8 +80,11 @@ func (addr Address) Bytes() []byte {
 func (addr Address) Hex() string {
 	enc := make([]byte, len(addr)*2)
 	hex.Encode(enc, addr[:])
-	hash := Sha256(enc)
-	return "0x" + hash.String()
+	return "0x" + string(enc)
+}
+
+func (addr Address) Big() *big.Int {
+	return new(big.Int).SetBytes(addr.Bytes())
 }
 
 func (addr Address) Nil() bool {
@@ -83,6 +100,10 @@ func BytesToAddress(b []byte) Address {
 	return addr
 }
 
+func BigToAddress(b *big.Int) Address {
+	return BytesToAddress(b.Bytes())
+}
+
 func CreateAddress(addr Address, nonce uint64) Address {
 	var buf = make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, nonce)
@@ -94,8 +115,12 @@ func HashToAddr(hash Hash) Address {
 }
 
 // Decode address in hex format to common.Address
-func DecodeAddr(d string) Address {
+func HexToAddress(d string) Address {
+	h := []byte(d)
 	dec := make([]byte, AddressLength)
-	hex.Decode(dec, []byte(d)[2:])
+	if bytes.Compare(h[:2], []byte("0x")) == 0 {
+		h = h[2:]
+	}
+	hex.Decode(dec, h)
 	return BytesToAddress(dec)
 }

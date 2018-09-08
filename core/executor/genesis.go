@@ -25,7 +25,7 @@ func (ex *Executor) createGenesis() (*types.Block, error) {
 			ParentHash: common.Sha256(common.Hash{}.Bytes()),
 			Height:     0,
 			StateRoot:  stateRoot,
-			Coinbase:   common.DecodeAddr("0x0000"),
+			Coinbase:   common.HexToAddress("0x0000"),
 			Time:       new(big.Int).SetInt64(int64(time.Now().UnixNano())),
 			Extra:      []byte("everyone can hold its asset in the blockchain"),
 		},

@@ -3,12 +3,12 @@
 package evm
 
 import (
-	json "github.com/json-iterator/go"
+	"encoding/json"
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
+	"tinychain/common"
+	"tinychain/core/vm/evm/hexutil"
+	"tinychain/core/vm/evm/math"
 )
 
 var _ = (*structLogMarshaling)(nil)

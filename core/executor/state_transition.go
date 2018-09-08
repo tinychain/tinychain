@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math/big"
 	"tinychain/core/types"
+	"tinychain/core/vm"
 	"tinychain/core/vm/evm"
 )
 
@@ -17,20 +18,20 @@ var (
 
 type StateTransition struct {
 	tx      *types.Transaction // state transition event
-	evm     *evm.EVM
-	statedb evm.StateDB
+	vm      vm.VM
+	statedb vm.StateDB
 }
 
-func NewStateTransition(evm *evm.EVM, tx *types.Transaction) *StateTransition {
+func NewStateTransition(virtualMachine vm.VM, tx *types.Transaction) *StateTransition {
 	return &StateTransition{
-		evm:     evm,
+		vm:      virtualMachine,
 		tx:      tx,
-		statedb: evm.StateDB,
+		statedb: virtualMachine.DB(),
 	}
 }
 
 // Make state transition by applying a new event
-func ApplyTx(evm *evm.EVM, tx *types.Transaction) ([]byte, uint64, bool, error) {
+func ApplyTx(evm vm.VM, tx *types.Transaction) ([]byte, uint64, bool, error) {
 	return NewStateTransition(evm, tx).Process()
 }
 
@@ -98,11 +99,11 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	)
 	if (st.to() == evm.AccountRef{}) {
 		// Contract create
-		ret, _, leftGas, vmerr = st.evm.Create(st.to(), st.data(), st.gas(), st.value())
+		ret, _, leftGas, vmerr = st.vm.Create(st.to(), st.data(), st.gas(), st.value())
 	} else {
 		// Call contract
 		st.statedb.SetNonce(st.from().Address(), st.statedb.GetNonce(st.from().Address())+1)
-		ret, leftGas, vmerr = st.evm.Call(st.from(), st.to().Address(), st.data(), st.gas(), st.value())
+		ret, leftGas, vmerr = st.vm.Call(st.from(), st.to().Address(), st.data(), st.gas(), st.value())
 	}
 	if vmerr != nil {
 		log.Errorf("VM returned with error %s", vmerr)

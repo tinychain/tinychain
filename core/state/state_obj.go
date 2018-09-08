@@ -70,6 +70,10 @@ func (s *stateObject) Code() []byte {
 	return s.code
 }
 
+func (s *stateObject) CodeSize() int {
+	return len(s.code)
+}
+
 func (s *stateObject) Balance() *big.Int {
 	return s.data.Balance
 }

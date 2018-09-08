@@ -19,14 +19,67 @@ package evm
 import (
 	"math/big"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/math"
+	"tinychain/common"
+	"tinychain/core/vm/evm/math"
+)
+
+const (
+	GasLimitBoundDivisor uint64 = 1024    // The bound divisor of the gas limit, used in update calculations.
+	MinGasLimit          uint64 = 5000    // Minimum the gas limit may ever be.
+	GenesisGasLimit      uint64 = 4712388 // Gas limit of the Genesis block.
+
+	MaximumExtraDataSize  uint64 = 32    // Maximum size extra data may be after Genesis.
+	ExpByteGas            uint64 = 10    // Times ceil(log256(exponent)) for the EXP instruction.
+	SloadGas              uint64 = 50    // Multiplied by the number of 32-byte words that are copied (round up) for any *COPY operation and added.
+	CallValueTransferGas  uint64 = 9000  // Paid for CALL when the value transfer is non-zero.
+	CallNewAccountGas     uint64 = 25000 // Paid for CALL when the destination address didn't exist prior.
+	TxGas                 uint64 = 21000 // Per transaction not creating a contract. NOTE: Not payable on data of calls between transactions.
+	TxGasContractCreation uint64 = 53000 // Per transaction that creates a contract. NOTE: Not payable on data of calls between transactions.
+	TxDataZeroGas         uint64 = 4     // Per byte of data attached to a transaction that equals zero. NOTE: Not payable on data of calls between transactions.
+	QuadCoeffDiv          uint64 = 512   // Divisor for the quadratic particle of the memory cost equation.
+	SstoreSetGas          uint64 = 20000 // Once per SLOAD operation.
+	LogDataGas            uint64 = 8     // Per byte in a LOG* operation's data.
+	CallStipend           uint64 = 2300  // Free gas given at beginning of call.
+
+	Sha3Gas          uint64 = 30    // Once per SHA3 operation.
+	Sha3WordGas      uint64 = 6     // Once per word of the SHA3 operation's data.
+	SstoreResetGas   uint64 = 5000  // Once per SSTORE operation if the zeroness changes from zero.
+	SstoreClearGas   uint64 = 5000  // Once per SSTORE operation if the zeroness doesn't change.
+	SstoreRefundGas  uint64 = 15000 // Once per SSTORE operation if the zeroness changes to zero.
+	JumpdestGas      uint64 = 1     // Refunded gas, once per SSTORE operation if the zeroness changes to zero.
+	EpochDuration    uint64 = 30000 // Duration between proof-of-work epochs.
+	CallGas          uint64 = 40    // Once per CALL operation & message call transaction.
+	CreateDataGas    uint64 = 200   //
+	CallCreateDepth  uint64 = 1024  // Maximum depth of call/create stack.
+	ExpGas           uint64 = 10    // Once per EXP instruction
+	LogGas           uint64 = 375   // Per LOG* operation.
+	CopyGas          uint64 = 3     //
+	StackLimit       uint64 = 1024  // Maximum size of VM stack allowed.
+	TierStepGas      uint64 = 0     // Once per operation, for a selection of them.
+	LogTopicGas      uint64 = 375   // Multiplied by the * of the LOG*, per LOG transaction. e.g. LOG0 incurs 0 * c_txLogTopicGas, LOG4 incurs 4 * c_txLogTopicGas.
+	CreateGas        uint64 = 32000 // Once per CREATE operation & contract-creation transaction.
+	Create2Gas       uint64 = 32000 // Once per CREATE2 operation
+	SuicideRefundGas uint64 = 24000 // Refunded following a suicide operation.
+	MemoryGas        uint64 = 3     // Times the address of the (highest referenced byte in memory + 1). NOTE: referencing happens on read, write and in instructions such as RETURN and CALL.
+	TxDataNonZeroGas uint64 = 68    // Per byte of data attached to a transaction that is not equal to zero. NOTE: Not payable on data of calls between transactions.
+
+	MaxCodeSize = 24576 // Maximum bytecode to permit for a contract
+)
+
+var (
+	Big1   = big.NewInt(1)
+	Big2   = big.NewInt(2)
+	Big3   = big.NewInt(3)
+	Big0   = big.NewInt(0)
+	Big32  = big.NewInt(32)
+	Big256 = big.NewInt(256)
+	Big257 = big.NewInt(257)
 )
 
 // calculates the memory size required for a step
 func calcMemSize(off, l *big.Int) *big.Int {
 	if l.Sign() == 0 {
-		return common.Big0
+		return Big0
 	}
 
 	return new(big.Int).Add(off, l)

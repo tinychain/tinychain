@@ -8,6 +8,7 @@ import (
 	"tinychain/common/cache"
 	"tinychain/core/bmt"
 	"tinychain/core/chain"
+	"tinychain/core/types"
 	"tinychain/db/leveldb"
 )
 
@@ -37,16 +38,22 @@ type revision struct {
 }
 
 type StateDB struct {
-	db             *cacheDB
-	nextRevisionId int
+	db *cacheDB
+
+	nextRevisionId int        // local revision id
 	revision       []revision // snapshot version index manager
-	journal        *journal   // journal of undo
+	journal        *journal   // journal of undo wrapper
+
 	bmt            BucketTree // bucket merkle tree of global state
 	bmtCacheHeight uint64     // chain height at which last release of bucket tree cache
 
 	stateObjects      map[common.Address]*stateObject // live state objects
 	stateObjectsDirty map[common.Address]struct{}     // dirty state objects
 	cacheStateObj     *cache.Cache
+
+	currHeight uint64 // block height of process currently
+
+	logs map[common.Hash]types.Logs
 }
 
 func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
@@ -101,7 +108,7 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 }
 
 // Create a new state object
-func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
+func (sdb *StateDB) CreateAccount(addr common.Address) *stateObject {
 	account := &Account{
 		Nonce:   uint64(0),
 		Balance: new(big.Int),
@@ -110,6 +117,10 @@ func (sdb *StateDB) CreateStateObj(addr common.Address) *stateObject {
 	sdb.journal.append(createObjectChange{&addr})
 	sdb.setStateObj(newObj)
 	return newObj
+}
+
+func (sdb *StateDB) UpdateCurrHeight(height uint64) {
+	atomic.StoreUint64(&sdb.currHeight, height)
 }
 
 // Set "live" state object
@@ -139,8 +150,9 @@ func (sdb *StateDB) SetState(addr common.Address, key common.Hash, value []byte)
 			Account: &addr,
 			Key:     key,
 			PreVal:  stateObj.GetState(key),
+			Height:  sdb.currHeight,
 		})
-		stateObj.SetState(key, value, chain.GetHeightOfChain())
+		stateObj.SetState(key, value, sdb.currHeight)
 	}
 }
 
@@ -165,7 +177,7 @@ func (sdb *StateDB) StateBmt(addr common.Address) BucketTree {
 func (sdb *StateDB) GetOrNewStateObj(addr common.Address) *stateObject {
 	stateObj := sdb.GetStateObj(addr)
 	if stateObj == nil || stateObj.deleted {
-		return sdb.CreateStateObj(addr)
+		return sdb.CreateAccount(addr)
 	}
 	return stateObj
 }
@@ -230,6 +242,20 @@ func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	}
 }
 
+func (sdb *StateDB) GetCode(addr common.Address) []byte {
+	if obj := sdb.GetStateObj(addr); obj != nil {
+		return obj.Code()
+	}
+	return nil
+}
+
+func (sdb *StateDB) GetCodeSize(address common.Address) int {
+	if obj := sdb.GetStateObj(address); obj != nil {
+		return obj.CodeSize()
+	}
+	return 0
+}
+
 func (sdb *StateDB) SetCode(addr common.Address, code []byte) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
@@ -263,6 +289,14 @@ func (sdb *StateDB) Suicide(addr common.Address) bool {
 	return true
 }
 
+func (sdb *StateDB) Empty(addr common.Address) bool {
+	obj := sdb.GetStateObj(addr)
+	if obj != nil {
+		return obj.Balance().Cmp(new(big.Int).SetInt64(0)) == 0 && obj.Nonce() == 0 && len(obj.Code()) == 0
+	}
+	return true
+}
+
 // Process dirty state object to state tree and get intermediate root
 func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 	dirtySet := bmt.NewWriteSet()
@@ -278,6 +312,7 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 }
 
 func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
+	defer sdb.clearJournal()
 	dirtySet := bmt.NewWriteSet()
 
 	for addr, stateObj := range sdb.stateObjects {
@@ -322,16 +357,11 @@ func (sdb *StateDB) reset() {
 	sdb.stateObjectsDirty = make(map[common.Address]struct{})
 	// evict old cache
 	sdb.cacheStateObj.EvictWithStrategy(func(blockNum uint64) bool {
-		if chain.GetHeightOfChain() < evictBlockGap {
+		if sdb.currHeight < evictBlockGap {
 			return false
 		}
-		return blockNum < chain.GetHeightOfChain()-evictBlockGap
+		return blockNum < sdb.currHeight-evictBlockGap
 	})
-	// clear bucket tree's cache with strategy
-	if chain.GetHeightOfChain()-sdb.bmtCacheHeight > evictBlockGap {
-		atomic.StoreUint64(&sdb.bmtCacheHeight, chain.GetHeightOfChain())
-		sdb.bmt.Purge()
-	}
 }
 
 // Snapshot returns an identifier for the current revision of the state.
@@ -361,4 +391,17 @@ func (sdb *StateDB) RevertToSnapshot(revid int) {
 	// Replay the journal to undo changes and remove invalid snapshots
 	sdb.journal.revert(sdb, snapshot)
 	sdb.revision = sdb.revision[:revid]
+}
+
+func (sdb *StateDB) clearJournal() {
+	sdb.journal = newJournal()
+	sdb.revision = sdb.revision[:0]
+}
+
+func (sdb *StateDB) AddLog(log *types.Log) {
+
+}
+
+func (sdb *StateDB) AddPreimage(hash common.Hash, d []byte) {
+
 }

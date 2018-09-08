@@ -22,18 +22,19 @@ import (
 	"io"
 	"math/big"
 	"time"
+	"tinychain/core/types"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/common/hexutil"
-	"github.com/ethereum/go-ethereum/common/math"
-	"github.com/ethereum/go-ethereum/core/types"
+	"tinychain/common"
+	"tinychain/core/vm/evm/math"
 )
 
+// Storage represents a contract's storage.
 type Storage map[common.Hash]common.Hash
 
-func (self Storage) Copy() Storage {
+// Copy duplicates the current storage.
+func (s Storage) Copy() Storage {
 	cpy := make(Storage)
-	for key, value := range self {
+	for key, value := range s {
 		cpy[key] = value
 	}
 
@@ -71,15 +72,17 @@ type structLogMarshaling struct {
 	Stack       []*math.HexOrDecimal256
 	Gas         math.HexOrDecimal64
 	GasCost     math.HexOrDecimal64
-	Memory      hexutil.Bytes
+	Memory      []byte
 	OpName      string `json:"opName"` // adds call to OpName() in MarshalJSON
 	ErrorString string `json:"error"`  // adds call to ErrorString() in MarshalJSON
 }
 
+// OpName formats the operand name in a human-readable format.
 func (s *StructLog) OpName() string {
 	return s.Op.String()
 }
 
+// ErrorString formats the log's error as a string.
 func (s *StructLog) ErrorString() string {
 	if s.Err != nil {
 		return s.Err.Error()
@@ -124,6 +127,7 @@ func NewStructLogger(cfg *LogConfig) *StructLogger {
 	return logger
 }
 
+// CaptureStart implements the Tracer interface to initialize the tracing operation.
 func (l *StructLogger) CaptureStart(from common.Address, to common.Address, create bool, input []byte, gas uint64, value *big.Int) error {
 	return nil
 }
@@ -178,10 +182,13 @@ func (l *StructLogger) CaptureState(env *EVM, pc uint64, op OpCode, gas, cost ui
 	return nil
 }
 
+// CaptureFault implements the Tracer interface to trace an execution fault
+// while running an opcode.
 func (l *StructLogger) CaptureFault(env *EVM, pc uint64, op OpCode, gas, cost uint64, memory *Memory, stack *Stack, contract *Contract, depth int, err error) error {
 	return nil
 }
 
+// CaptureEnd is called after the call finishes to finalize the tracing.
 func (l *StructLogger) CaptureEnd(output []byte, gasUsed uint64, t time.Duration, err error) error {
 	l.output = output
 	l.err = err
@@ -232,10 +239,10 @@ func WriteTrace(writer io.Writer, logs []StructLog) {
 	}
 }
 
-// WriteLogs writes evm logs in a readable format to the given writer
+// WriteLogs writes vm logs in a readable format to the given writer
 func WriteLogs(writer io.Writer, logs []*types.Log) {
 	for _, log := range logs {
-		fmt.Fprintf(writer, "LOG%d: %x bn=%d txi=%x\n", len(log.Topics), log.Address, log.BlockNumber, log.TxIndex)
+		fmt.Fprintf(writer, "LOG%d: %x bn=%d txi=%x\n", len(log.Topics), log.Address, log.BlockHeight, log.TxIndex)
 
 		for i, topic := range log.Topics {
 			fmt.Fprintf(writer, "%08d  %x\n", i, topic)

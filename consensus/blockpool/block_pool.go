@@ -1,17 +1,17 @@
 package blockpool
 
 import (
-	"sync"
-	"tinychain/event"
-	"tinychain/core/types"
-	"tinychain/core"
+	"encoding/json"
 	"errors"
-	"tinychain/common"
-	"tinychain/p2p/pb"
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/op/go-logging"
-	"encoding/json"
+	"sync"
 	"sync/atomic"
+	"tinychain/common"
+	"tinychain/core"
+	"tinychain/core/types"
+	"tinychain/event"
+	"tinychain/p2p/pb"
 )
 
 const (

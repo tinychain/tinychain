@@ -17,20 +17,20 @@
 package runtime
 
 import (
+	"github.com/ethereum/go-ethereum/params"
 	"math"
 	"math/big"
 	"time"
+	"tinychain/db/leveldb"
 
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethdb"
-	"github.com/ethereum/go-ethereum/params"
+	"tinychain/common"
+	"tinychain/core/state"
+	"tinychain/core/vm/evm"
+	"tinychain/core/vm/evm/crypto"
 )
 
 // Config is a basic type specifying certain configuration flags for running
-// the EVM.
+// the Eevm.
 type Config struct {
 	ChainConfig *params.ChainConfig
 	Difficulty  *big.Int
@@ -42,7 +42,7 @@ type Config struct {
 	GasPrice    *big.Int
 	Value       *big.Int
 	Debug       bool
-	EVMConfig   vm.Config
+	EVMConfig   evm.Config
 
 	State     *state.StateDB
 	GetHashFn func(n uint64) common.Hash
@@ -52,7 +52,7 @@ type Config struct {
 func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
 		cfg.ChainConfig = &params.ChainConfig{
-			ChainId:        big.NewInt(1),
+			ChainID:        big.NewInt(1),
 			HomesteadBlock: new(big.Int),
 			DAOForkBlock:   new(big.Int),
 			DAOForkSupport: false,
@@ -98,14 +98,15 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 	}
 	setDefaults(cfg)
 
+	db, _ := leveldb.NewLDBDataBase("database")
+
 	if cfg.State == nil {
-		db, _ := ethdb.NewMemDatabase()
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(db))
+		cfg.State, _ = state.New(db, nil)
 	}
 	var (
 		address = common.BytesToAddress([]byte("contract"))
 		vmenv   = NewEnv(cfg)
-		sender  = vm.AccountRef(cfg.Origin)
+		sender  = evm.AccountRef(cfg.Origin)
 	)
 	cfg.State.CreateAccount(address)
 	// set the receiver's (the executing contract) code for execution.
@@ -130,12 +131,11 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 	setDefaults(cfg)
 
 	if cfg.State == nil {
-		db, _ := ethdb.NewMemDatabase()
-		cfg.State, _ = state.New(common.Hash{}, state.NewDatabase(db))
+		cfg.State, _ = state.New(common.Hash{})
 	}
 	var (
 		vmenv  = NewEnv(cfg)
-		sender = vm.AccountRef(cfg.Origin)
+		sender = evm.AccountRef(cfg.Origin)
 	)
 
 	// Call the code with the given configuration.

@@ -1,10 +1,10 @@
 package types
 
 import (
-	"tinychain/common"
 	json "github.com/json-iterator/go"
-	"tinychain/core/bmt"
 	"strconv"
+	"tinychain/common"
+	"tinychain/core/bmt"
 )
 
 // Receipt represents the results of a transaction
@@ -15,15 +15,7 @@ type Receipt struct {
 	TxHash          common.Hash    `json:"tx_hash"`          // Transaction hash
 	ContractAddress common.Address `json:"contract_address"` // Contract address
 	GasUsed         uint64         `json:"gas_used"`         // gas used of transaction
-}
-
-func NewRecipet(root common.Hash, status bool, txHash common.Hash, gasUsed uint64) *Receipt {
-	return &Receipt{
-		PostState: root,
-		Status:    status,
-		TxHash:    txHash,
-		GasUsed:   gasUsed,
-	}
+	Logs            []*Log         `json:"logs"`             // contract log events
 }
 
 func (re *Receipt) SetContractAddress(addr common.Address) {

@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 	"tinychain/common"
+	"tinychain/consensus"
 	"tinychain/consensus/blockpool"
 	"tinychain/core"
 	"tinychain/core/state"
@@ -31,21 +32,6 @@ const (
 	minerReward           = 998
 )
 
-type Blockchain interface {
-	LastBlock() *types.Block
-	GetBlockByHeight(height uint64) *types.Block
-	GetBlockByHash(hash common.Hash) *types.Block
-}
-
-type BlockValidator interface {
-	ValidateHeader(b *types.Block) error
-	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
-}
-
-type TxValidator interface {
-	ValidateTx(transaction *types.Transaction) error
-}
-
 type consensusInfo struct {
 	Difficulty uint64 `json:"Difficulty"` // difficulty target bits for mining
 	Nonce      uint64 `json:"nonce"`      // computed result
@@ -59,14 +45,14 @@ func (ci *consensusInfo) Serialize() ([]byte, error) {
 type ProofOfWork struct {
 	config           *Config
 	event            *event.TypeMux
-	chain            Blockchain
+	chain            consensus.Blockchain
 	state            *state.StateDB
 	blockPool        *blockpool.BlockPool
 	txPool           *txpool.TxPool
-	blValidator      BlockValidator // block validator
-	csValidator      *csValidator   // consensus validator
-	blockNum         uint64         // new block num at certain difficulty period
-	currMiningHeader *types.Header  // block header that being mined currently
+	blValidator      consensus.BlockValidator // block validator
+	csValidator      *csValidator             // consensus validator
+	blockNum         uint64                   // new block num at certain difficulty period
+	currMiningHeader *types.Header            // block header that being mined currently
 
 	address common.Address
 	privKey crypto.PrivKey
@@ -85,7 +71,7 @@ type ProofOfWork struct {
 	receiptsSub  event.Subscription // listen for the receipts executed by executor
 }
 
-func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator BlockValidator, txValidator TxValidator) (*ProofOfWork, error) {
+func New(config *common.Config, state *state.StateDB, chain consensus.Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*ProofOfWork, error) {
 	conf := newConfig(config)
 
 	csValidator := newCsValidator(chain)

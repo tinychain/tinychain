@@ -1,9 +1,9 @@
 package state
 
 import (
-	"tinychain/common"
-	"math/big"
 	"encoding/json"
+	"math/big"
+	"tinychain/common"
 )
 
 type journalEntry interface {
@@ -60,11 +60,15 @@ type (
 		Account *common.Address `json:"account"`
 		Key     common.Hash     `json:"key"`
 		PreVal  []byte          `json:"pre_val"`
+		Height  uint64          `json:"height"`
 	}
 	codeChange struct {
 		Account  *common.Address `json:"account"`
 		PrevCode []byte          `json:"prev_code"`
 		PrevHash common.Hash     `json:"prev_code"`
+	}
+	addLogChange struct {
+
 	}
 
 	// Change of the state value
@@ -114,7 +118,7 @@ func (ch nonceChange) serialize() ([]byte, error) {
 
 func (ch storageChange) undo(s *StateDB) {
 	if obj := s.GetStateObj(*ch.Account); obj != nil {
-		obj.SetState(ch.Key, ch.PreVal)
+		obj.SetState(ch.Key, ch.PreVal, ch.Height)
 	}
 }
 

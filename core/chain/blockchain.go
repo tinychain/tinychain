@@ -130,11 +130,11 @@ func (bc *Blockchain) LastFinalBlock() *types.Block {
 	return block
 }
 
-func (bc *Blockchain) GetHeader(hash common.Hash) *types.Header {
+func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
 	if header, ok := bc.headerCache.Get(hash); ok {
 		return header.(*types.Header)
 	}
-	blk := bc.GetBlockByHash(hash)
+	blk := bc.GetBlock(hash, height)
 	if blk == nil {
 		return nil
 	}

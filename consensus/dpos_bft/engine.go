@@ -1,22 +1,21 @@
 package dpos_bft
 
 import (
-	"tinychain/core/types"
-	"tinychain/core/state"
-	"tinychain/event"
-	"tinychain/core"
-	"tinychain/common"
-	"time"
-	"math/big"
-	"sync/atomic"
-	"tinychain/p2p"
-	"tinychain/consensus/blockpool"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-peer"
+	"math/big"
 	"sync"
+	"sync/atomic"
+	"time"
+	"tinychain/common"
 	"tinychain/consensus"
-	"tinychain/core/executor"
+	"tinychain/consensus/blockpool"
+	"tinychain/core"
+	"tinychain/core/state"
 	"tinychain/core/txpool"
+	"tinychain/core/types"
+	"tinychain/event"
+	"tinychain/p2p"
 )
 
 var (
@@ -25,24 +24,12 @@ var (
 
 const (
 	// Period type of the BFT algorithm
-	PROPOSE    = iota
+	PROPOSE = iota
 	PRE_COMMIT
 	COMMIT
 
 	BLOCK_PROPOSE_GAP = 5 * time.Second
 )
-
-type TxPool interface {
-	Start()
-	Stop()
-	Pending() types.Transactions
-	Drop(transactions types.Transactions)
-}
-
-type Blockchain interface {
-	LastBlock() *types.Block      // Last block in memory
-	LastFinalBlock() *types.Block // Last irreversible block
-}
 
 // Engine is the main wrapper of dpos_bft algorithm
 // The dpos_bft algorithm process procedures described below:
@@ -55,12 +42,12 @@ type Engine struct {
 
 	state            *state.StateDB           // current state
 	seqNo            atomic.Value             // next block height at bft processing
-	chain            Blockchain               // current blockchain
+	chain            consensus.Blockchain     // current blockchain
 	peerPool         *peerPool                // manage and operate block producers' info
-	blockPool        blockpool.BlockPool      // pool to retrieves new proposed blocks
-	txPool           TxPool                   // TxPool used to filter out valid transactions
+	blockPool        *blockpool.BlockPool     // pool to retrieves new proposed blocks
+	txPool           *txpool.TxPool           // TxPool used to filter out valid transactions
 	receipts         sync.Map                 // save receipts of block map[uint64]receipts
-	validator        executor.BlockValidator // Block validator to validate state
+	validator        consensus.BlockValidator // Block validator to validate state
 	execCompleteChan chan struct{}            // channel for informing the process is completed
 
 	bftState       atomic.Value // the state of current bft period
@@ -77,15 +64,15 @@ type Engine struct {
 	commitCompleteSub event.Subscription // Subscribe commit complete event from executor
 }
 
-func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.ID, validator consensus.BlockValidator) (*Engine, error) {
+func New(config *common.Config, state *state.StateDB, chain consensus.Blockchain, id peer.ID, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*Engine, error) {
 	conf := newConfig(config)
 	engine := &Engine{
 		config:           conf,
 		chain:            chain,
 		state:            state,
 		event:            event.GetEventhub(),
-		validator:        validator,
-		blockPool:        blockpool.NewBlockPool(config, validator, log, common.ProposeBlockMsg),
+		validator:        blValidator,
+		blockPool:        blockpool.NewBlockPool(config, blValidator, nil, log, common.ProposeBlockMsg),
 		execCompleteChan: make(chan struct{}),
 		quitCh:           make(chan struct{}),
 	}
@@ -99,9 +86,9 @@ func New(config *common.Config, state *state.StateDB, chain Blockchain, id peer.
 			return nil, err
 		}
 		self.privKey = privKey
-		engine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, false, false)
+		engine.txPool = txpool.NewTxPool(config, txValidator, state, false, false)
 	} else {
-		engine.txPool = txpool.NewTxPool(config, executor.NewTxValidator(executor.NewConfig(config), state), state, true, true)
+		engine.txPool = txpool.NewTxPool(config, txValidator, state, true, true)
 	}
 	engine.peerPool = newBpPool(conf, log, self, chain)
 
@@ -136,7 +123,6 @@ func (eg *Engine) init() {
 
 func (eg *Engine) nextBFTRound() {
 	seqNo := eg.SeqNo()
-	eg.blockPool.DelBlock(seqNo)
 	eg.receipts.Delete(seqNo)
 	eg.txPool.Drop(eg.chain.LastBlock().Transactions)
 
