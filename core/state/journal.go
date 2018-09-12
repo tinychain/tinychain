@@ -3,6 +3,7 @@ package state
 import (
 	"encoding/json"
 	"math/big"
+	"sync/atomic"
 	"tinychain/common"
 )
 
@@ -41,12 +42,14 @@ type (
 	createObjectChange struct {
 		Account *common.Address `json:"account"`
 	}
+	resetObjectChange struct {
+		prev *stateObject
+	}
 	suicideChange struct {
 		Account     *common.Address `json:"account"`
 		prev        bool
 		prevBalance *big.Int
 	}
-
 	// Changes of the individual accounts
 	balanceChange struct {
 		Account *common.Address `json:"account"`
@@ -67,8 +70,8 @@ type (
 		PrevCode []byte          `json:"prev_code"`
 		PrevHash common.Hash     `json:"prev_code"`
 	}
-	addLogChange struct {
-
+	logChange struct {
+		txHash common.Hash
 	}
 
 	// Change of the state value
@@ -81,6 +84,14 @@ func (ch createObjectChange) undo(s *StateDB) {
 }
 
 func (ch createObjectChange) serialize() ([]byte, error) {
+	return json.Marshal(ch)
+}
+
+func (ch resetObjectChange) undo(s *StateDB) {
+	s.setStateObj(ch.prev)
+}
+
+func (ch resetObjectChange) serialize() ([]byte, error) {
 	return json.Marshal(ch)
 }
 
@@ -133,5 +144,19 @@ func (ch codeChange) undo(s *StateDB) {
 }
 
 func (ch codeChange) serialize() ([]byte, error) {
+	return json.Marshal(ch)
+}
+
+func (ch logChange) undo(s *StateDB) {
+	logs := s.GetLogs(ch.txHash)
+	if len(logs) == 1 {
+		delete(s.txStat.logs, ch.txHash)
+	} else {
+		s.txStat.logs[ch.txHash] = logs[:len(logs)-1]
+	}
+	atomic.AddUint32(&s.logSize, -1)
+}
+
+func (ch logChange) serialize() ([]byte, error) {
 	return json.Marshal(ch)
 }

@@ -178,7 +178,7 @@ func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 	if err != nil {
 		return nil
 	}
-	if header, ok := bc.headerCache.Get(height); ok {
+	if header, ok := bc.headerCache.Get(hash); ok {
 		return header.(*types.Header)
 	}
 	header, err := bc.db.GetHeader(height, hash)
@@ -186,6 +186,17 @@ func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 		return nil
 	}
 	bc.headerCache.Add(hash, header)
+	return header
+}
+
+func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
+	if header, ok := bc.headerCache.Get(hash); ok {
+		return header.(*types.Header)
+	}
+	header, err := bc.db.GetHeader(height, hash)
+	if err != nil {
+		return nil
+	}
 	return header
 }
 

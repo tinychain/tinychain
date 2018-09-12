@@ -335,7 +335,7 @@ func (evm *EVM) create(caller vm.ContractRef, code []byte, gas uint64, value *bi
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
 	evm.StateDB.CreateAccount(address)
-
+	evm.StateDB.SetNonce(address, 1)
 	evm.Transfer(evm.StateDB, caller.Address(), address, value)
 
 	// initialise a new contract and set the code that is to be used by the

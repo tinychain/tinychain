@@ -42,7 +42,8 @@ func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 		header       = block.Header
 	)
 
-	for _, tx := range block.Transactions {
+	for i, tx := range block.Transactions {
+		sp.statedb.Prepare(tx.Hash(), block.Hash(), uint32(i))
 		receipt, gasUsed, err := ApplyTransaction(sp.conf, sp.bc, nil, sp.statedb, header, tx)
 		if err != nil {
 			return nil, err
@@ -92,5 +93,7 @@ func newVM(config *common.Config, tx *types.Transaction, header *types.Header, b
 		// Create a new context to be used in the EVM environment
 		context := evm.NewEVMContext(tx, header, bc, author)
 		return evm.NewEVM(context, statedb, cfg)
+	default:
+		return nil
 	}
 }

@@ -37,6 +37,14 @@ type revision struct {
 	journalIndex int
 }
 
+// txStat wraps the tx info at a certain execution of transaction
+type txStat struct {
+	txHash, blockHash common.Hash
+	txIndex           uint32
+	logs              map[common.Hash]types.Logs
+	logSize           uint32
+}
+
 type StateDB struct {
 	db *cacheDB
 
@@ -52,8 +60,7 @@ type StateDB struct {
 	cacheStateObj     *cache.Cache
 
 	currHeight uint64 // block height of process currently
-
-	logs map[common.Hash]types.Logs
+	txStat
 }
 
 func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
@@ -70,6 +77,9 @@ func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
 		stateObjects:      make(map[common.Address]*stateObject),
 		stateObjectsDirty: make(map[common.Address]struct{}),
 		cacheStateObj:     cache.NewCache(cache.NewLBN()),
+		txStat: txStat{
+			logs: make(map[common.Hash]types.Logs),
+		},
 	}, nil
 }
 
@@ -107,16 +117,37 @@ func (sdb *StateDB) GetStateObj(addr common.Address) *stateObject {
 	return stateObj
 }
 
-// Create a new state object
-func (sdb *StateDB) CreateAccount(addr common.Address) *stateObject {
+// CreateAccount explicitly creates a state object. If a state object with the address
+// already exists the balance is carried over to the new account.
+//
+// CreateAccount is called during the EVM CREATE operation. The situation might arise that
+// a contract does the following:
+//
+//   1. sends funds to sha(account ++ (nonce + 1))
+//   2. tx_create(sha(account ++ nonce)) (note that this gets the address of 1)
+//
+// Carrying over the balance ensures that Ether doesn't disappear.
+func (sdb *StateDB) CreateAccount(addr common.Address) {
+	new, prev := sdb.createStateObj(addr)
+	if prev != nil {
+		new.SetBalance(prev.Balance())
+	}
+}
+
+func (sdb *StateDB) createStateObj(addr common.Address) (*stateObject, *stateObject) {
+	prev := sdb.GetStateObj(addr)
 	account := &Account{
 		Nonce:   uint64(0),
 		Balance: new(big.Int),
 	}
 	newObj := newStateObject(sdb, addr, account, sdb.setDirty)
-	sdb.journal.append(createObjectChange{&addr})
+	if prev == nil {
+		sdb.journal.append(createObjectChange{&addr})
+	} else {
+		sdb.journal.append(resetObjectChange{prev})
+	}
 	sdb.setStateObj(newObj)
-	return newObj
+	return newObj, prev
 }
 
 func (sdb *StateDB) UpdateCurrHeight(height uint64) {
@@ -177,7 +208,7 @@ func (sdb *StateDB) StateBmt(addr common.Address) BucketTree {
 func (sdb *StateDB) GetOrNewStateObj(addr common.Address) *stateObject {
 	stateObj := sdb.GetStateObj(addr)
 	if stateObj == nil || stateObj.deleted {
-		return sdb.CreateAccount(addr)
+		stateObj, _ = sdb.createStateObj(addr)
 	}
 	return stateObj
 }
@@ -398,10 +429,23 @@ func (sdb *StateDB) clearJournal() {
 	sdb.revision = sdb.revision[:0]
 }
 
-func (sdb *StateDB) AddLog(log *types.Log) {
-
+// Prepare will be called when execute a new tx in state processor
+func (sdb *StateDB) Prepare(txHash, blockHash common.Hash, txIndex uint32) {
+	sdb.txHash = txHash
+	sdb.blockHash = blockHash
+	sdb.txIndex = txIndex
 }
 
-func (sdb *StateDB) AddPreimage(hash common.Hash, d []byte) {
+func (sdb *StateDB) AddLog(log *types.Log) {
+	sdb.journal.append(logChange{sdb.txHash})
 
+	log.TxHash = sdb.txHash
+	log.BlockHash = sdb.blockHash
+	logs := sdb.GetLogs(sdb.txHash)
+	sdb.logs[sdb.txHash] = append(logs, log)
+	atomic.AddUint32(&sdb.logSize, 1)
+}
+
+func (sdb *StateDB) GetLogs(txHash common.Hash) types.Logs {
+	return sdb.txStat.logs[txHash]
 }
