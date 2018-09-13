@@ -34,6 +34,8 @@ type ProposeBlockEvent struct {
 	Block *types.Block
 }
 
+// ConsensusEvent will be posted after a new block proposed by the BP
+// completed execution without errors
 type ConsensusEvent struct {
 	Block *types.Block
 }
@@ -44,6 +46,13 @@ type CommitBlockEvent struct {
 
 type CommitCompleteEvent struct {
 	Block *types.Block
+}
+
+// NewReceiptsEvent will be posted after a block from other nodes come in,
+// completed execution without errors and passed verification.
+type NewReceiptsEvent struct {
+	Block    *types.Block
+	Receipts types.Receipts
 }
 
 /*
@@ -62,11 +71,3 @@ type ExecPendingTxEvent struct {
 }
 
 type TxBroadcastEvent struct{}
-
-/*
-	Receipts events
- */
-type NewReceiptsEvent struct {
-	Block    *types.Block
-	Receipts types.Receipts
-}

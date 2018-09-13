@@ -159,6 +159,7 @@ func (ex *Executor) applyBlock(block *types.Block) error {
 	// Save receipts to cache
 	ex.receiptsCache.Store(block.Height(), receipts)
 
+	// Add block in memory blockchain
 	if err := ex.chain.AddBlock(block); err != nil {
 		log.Errorf("failed to add block to blockchain cache, err:%s", err)
 		return err

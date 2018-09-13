@@ -24,25 +24,25 @@ func newWorker(difficulty uint64, minBound uint64, maxBound uint64, header *type
 }
 
 // Run starts a computing task to find a valid nonce
-func (w *worker) Run(foundChan *nonceChan) {
+func (w *worker) run(found chan uint64, abort chan struct{}) {
 	var result big.Int
 
 	nonce := w.minBound
 	for nonce <= w.maxBound {
 		select {
-		case <-foundChan.ch:
+		case <-abort:
 			return
 		default:
+			hash, err := computeHash(nonce, w.header)
+			if err != nil {
+				return
+			}
+			result.SetBytes(hash)
+			if result.Cmp(w.target) == -1 {
+				break
+			}
+			nonce++
 		}
-		hash, err := computeHash(nonce, w.header)
-		if err != nil {
-			return
-		}
-		result.SetBytes(hash)
-		if result.Cmp(w.target) == -1 {
-			break
-		}
-		nonce++
 	}
-	foundChan.post(nonce)
+	found <- nonce
 }

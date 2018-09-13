@@ -42,7 +42,7 @@ func (v *BlockValidator) ValidateHeader(header *types.Header) error {
 	}
 	parent := v.chain.GetHeaderByHash(header.ParentHash)
 	if parent == nil {
-		if header.Height == 0 {
+		if header.Height != 0 {
 			return nil
 		}
 		return errParentNotExist
@@ -51,7 +51,7 @@ func (v *BlockValidator) ValidateHeader(header *types.Header) error {
 }
 
 // ValidateHeaders validate headers in batch, used by sync-chain processing.
-// It returns two channels, one is to abort the validate process, and the other is to store errors
+// It returns two channels, one is to abort the validate process, and the other is to store errors。
 func (v *BlockValidator) ValidateHeaders(headers []*types.Header) (chan struct{}, chan error) {
 	workers := runtime.GOMAXPROCS(runtime.NumCPU())
 	if workers > len(headers) {

@@ -121,7 +121,7 @@ func (pow *ProofOfWork) listen() {
 		select {
 		case ev := <-pow.consensusSub.Chan():
 			block := ev.(*core.ConsensusEvent).Block
-			go pow.run(block)
+			go pow.commit(block)
 		case <-pow.newBlockSub.Chan():
 			go pow.process()
 		case ev := <-pow.receiptsSub.Chan():
@@ -172,7 +172,7 @@ func (pow *ProofOfWork) proposeBlock() {
 	}
 
 	block := types.NewBlock(header, pow.txPool.Pending())
-	go pow.event.Post(&core.ProposeBlockEvent{block})
+	pow.run(block)
 	log.Infof("Block producer %s propose a new block, height = #%d", pow.Addr(), block.Height())
 }
 
@@ -192,41 +192,43 @@ func (pow *ProofOfWork) process() {
 // run performs proof-of-work.
 // It will return error if other miner found a block with the same height
 func (pow *ProofOfWork) run(block *types.Block) error {
-	n := runtime.NumCPU()
-	avg := maxNonce / n
-	foundChan := newNonceChan()
+	var (
+		abort = make(chan struct{})
+		found = make(chan uint64)
+		n     = runtime.NumCPU()
+		avg   = maxNonce / n
+	)
 	newDiff, err := pow.adjustDiff()
 	if err != nil {
 		return fmt.Errorf("cannot adjust difficulty when start to mine block #%d", block.Height())
 	}
 	pow.currMiningHeader = block.Header
 	for i := 0; i < n; i++ {
-		go newWorker(newDiff, uint64(avg*i), uint64(avg*(i+1)), block.Header).Run(foundChan)
+		go newWorker(newDiff, uint64(avg*i), uint64(avg*(i+1)), block.Header).run(found, abort)
 	}
+	defer close(found)
 
 	var nonce uint64
 	select {
-	case nonce = <-foundChan.ch:
+	case nonce = <-found:
+		close(abort)
 	case <-pow.mineStopCh:
 		// close all mining work
-		foundChan.close()
+		close(abort)
 		return fmt.Errorf("stop mining, a block with the same height #%d found", block.Height())
-
 	}
-	// close channel and notify other workers to stop mining
-	foundChan.close()
 
-	consensus := &consensusInfo{
+	csinfo := &consensusInfo{
 		Difficulty: newDiff,
 		Nonce:      nonce,
 	}
-	data, err := consensus.Serialize()
+	data, err := csinfo.Serialize()
 	if err != nil {
 		return fmt.Errorf("failed to encode consensus info, err:%s", err)
 	}
 	block.Header.ConsensusInfo = data
 	pow.currMiningHeader = nil
-	pow.commit(block)
+	go pow.event.Post(&core.ProposeBlockEvent{block})
 	return nil
 }
 

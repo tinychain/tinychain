@@ -46,7 +46,7 @@ func (ex *Executor) commit(block *types.Block) error {
 
 // stateCommit commits the state transition at the given block height
 func (ex *Executor) stateCommit(height uint64) (common.Hash, error) {
-	return ex.state.Commit(db.GetBatch(ex.db.LDB(), height), height)
+	return ex.state.Commit(db.GetBatch(ex.db.LDB(), height))
 }
 
 func (ex *Executor) persistTxs(block *types.Block) error {

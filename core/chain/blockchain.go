@@ -31,16 +31,16 @@ type Blockchain struct {
 	lastFinalBlock atomic.Value // last final block of chian
 	mu             sync.RWMutex
 
-	blocksCache *lru.Cache // blocks lru cache
+	blockCache  *lru.Cache // blocks lru cache
 	headerCache *lru.Cache // headers lru cache
 }
 
 func NewBlockchain(db *leveldb.LDBDatabase) (*Blockchain, error) {
-	blocksCache, _ := lru.New(blockCacheLimit)
+	blockCache, _ := lru.New(blockCacheLimit)
 	headerCache, _ := lru.New(headerCacheLimit)
 	bc := &Blockchain{
 		db:          tdb.NewTinyDB(db),
-		blocksCache: blocksCache,
+		blockCache:  blockCache,
 		headerCache: headerCache,
 	}
 	bc.genesis = bc.GetBlockByHeight(0)
@@ -74,7 +74,6 @@ func (bc *Blockchain) Reset() error {
 }
 
 func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
-
 	if err := bc.db.PutBlock(bc.db.LDB().NewBatch(), genesis, false, true); err != nil {
 		log.Errorf("failed to put genesis into db, err:%s", err)
 		return err
@@ -85,20 +84,21 @@ func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
 		log.Errorf("failed to put genesis hash into db, err:%s", err)
 		return err
 	}
-	bc.purge()
-	bc.blocksCache.Add(genesis.Height(), genesis)
+	bc.Purge()
+	bc.blockCache.Add(genesis.Height(), genesis)
 	bc.genesis = genesis
 	bc.lastBlock.Store(genesis)
 
 	return nil
 }
 
-func (bc *Blockchain) purge() {
+// Purge drop the blocks in memory and revert the blockchain to the height of `lastFinalBlock`
+func (bc *Blockchain) Purge() {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
 	bc.lastBlock.Store(nil)
-	bc.blocksCache.Purge()
+	bc.blockCache.Purge()
 	bc.headerCache.Purge()
 }
 
@@ -148,7 +148,7 @@ func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {
 		log.Errorf("failed to get block from db, err:%s", err)
 		return nil
 	}
-	bc.blocksCache.Add(hash, block)
+	bc.blockCache.Add(hash, block)
 	return block
 }
 
@@ -162,7 +162,7 @@ func (bc *Blockchain) GetBlockByHeight(height uint64) *types.Block {
 }
 
 func (bc *Blockchain) GetBlockByHash(hash common.Hash) *types.Block {
-	if block, ok := bc.blocksCache.Get(hash); ok {
+	if block, ok := bc.blockCache.Get(hash); ok {
 		return block.(*types.Block)
 	}
 	height, err := bc.db.GetHeight(hash)
@@ -186,17 +186,6 @@ func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 		return nil
 	}
 	bc.headerCache.Add(hash, header)
-	return header
-}
-
-func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
-	if header, ok := bc.headerCache.Get(hash); ok {
-		return header.(*types.Header)
-	}
-	header, err := bc.db.GetHeader(height, hash)
-	if err != nil {
-		return nil
-	}
 	return header
 }
 
@@ -225,7 +214,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 			"block #%d cannot be added into blockchain because its previous block height is #%d",
 			block.Height(), last.Height()))
 	}
-	bc.blocksCache.Add(block.Hash(), block)
+	bc.blockCache.Add(block.Hash(), block)
 	bc.lastBlock.Store(block)
 	return nil
 }
