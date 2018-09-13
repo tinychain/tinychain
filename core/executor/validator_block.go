@@ -35,6 +35,8 @@ func NewBlockValidator(config *common.Config, chain *chain.Blockchain) *BlockVal
 
 // ValidateHeader validate headers, called by outer obj
 // 1. check header already exist or not
+// 2. check parent exist or not
+// 3. check detail header info
 func (v *BlockValidator) ValidateHeader(header *types.Header) error {
 	//  TODO Check timestamp
 	if v.chain.GetHeader(header.Hash(), header.Height) != nil {
@@ -133,7 +135,7 @@ func (v *BlockValidator) validateHeader(parent, header *types.Header) error {
 
 // Validate block body
 // 1. Check block already exist in db or not
-// 1. Validate transactions and tx root
+// 1. Check transactions match tx root in header or not
 func (v *BlockValidator) ValidateBody(block *types.Block) error {
 	if old := v.chain.GetBlockByHash(block.Hash()); old != nil {
 		return errBlockExist

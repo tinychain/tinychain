@@ -33,6 +33,7 @@ type Executor struct {
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
+	validator *BlockValidator
 	quitCh    chan struct{}
 
 	receiptsCache sync.Map // receipts cache, map[uint64]types.Receipts
@@ -46,12 +47,13 @@ type Executor struct {
 
 func New(config *common.Config, db *db.TinyDB, chain *chain.Blockchain, engine consensus.Engine) *Executor {
 	executor := &Executor{
-		conf:   config,
-		db:     db,
-		chain:  chain,
-		engine: engine,
-		event:  event.GetEventhub(),
-		quitCh: make(chan struct{}),
+		conf:      config,
+		db:        db,
+		chain:     chain,
+		engine:    engine,
+		event:     event.GetEventhub(),
+		validator: NewBlockValidator(config, chain),
+		quitCh:    make(chan struct{}),
 	}
 	return executor
 }
@@ -144,8 +146,17 @@ func (ex *Executor) processState() int {
 //	return nil
 //}
 
+// Validate validate block body.
+func (ex *Executor) validate(block *types.Block) error {
+	return ex.validator.ValidateBody(block)
+}
+
 // applyBlockBlock process the validation and execute the received block.
 func (ex *Executor) applyBlock(block *types.Block) error {
+	if err := ex.validate(block); err != nil {
+		log.Errorf("block is invalid, %s", err)
+		return err
+	}
 	if currHeight := ex.chain.LastBlock().Height(); block.Height() != currHeight+1 {
 		return fmt.Errorf("block height is not match, demand #%d, got #%d", currHeight+1, block.Height())
 	}
@@ -177,6 +188,11 @@ func (ex *Executor) applyBlock(block *types.Block) error {
 // proposeBlock executes new transactions from tx_pool and pack a new block.
 // The new block is created by consensus engine and does not include state_root, tx_root and receipts_root.
 func (ex *Executor) proposeBlock(block *types.Block) error {
+	if err := ex.validate(block); err != nil {
+		log.Errorf("block is invalid, %s", err)
+		return err
+	}
+
 	ex.state.UpdateCurrHeight(block.Height())
 	receipts, err := ex.execBlock(block)
 	if err != nil {
@@ -186,6 +202,12 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 
 	// Save receipts to cache
 	ex.receiptsCache.Store(block.Height(), receipts)
+
+	// Add block in memory blockchain
+	if err := ex.chain.AddBlock(block); err != nil {
+		log.Errorf("failed to add block to blockchain cache, err:%s", err)
+		return err
+	}
 
 	newBlk, err := ex.engine.Finalize(block.Header, ex.state, block.Transactions, receipts)
 	if err != nil {

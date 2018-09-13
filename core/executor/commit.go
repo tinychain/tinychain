@@ -37,6 +37,7 @@ func (ex *Executor) commit(block *types.Block) error {
 		log.Errorf("failed to commit db.Batch, err: %s", err)
 		return err
 	}
+
 	log.Infof("New block height = #%d commits. Hash = %s", block.Height(), block.Hash().Hex())
 	go ex.event.Post(&core.CommitCompleteEvent{
 		Block: block,
@@ -58,5 +59,5 @@ func (ex *Executor) persistReceipts(block *types.Block, receipts types.Receipts)
 }
 
 func (ex *Executor) commitBlock(block *types.Block) error {
-	return ex.chain.CommitBlock(block)
+	return ex.chain.CommitBlock(db.GetBatch(ex.db.LDB(), block.Height()), block)
 }

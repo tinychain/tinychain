@@ -134,12 +134,12 @@ func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
 	if header, ok := bc.headerCache.Get(hash); ok {
 		return header.(*types.Header)
 	}
-	blk := bc.GetBlock(hash, height)
-	if blk == nil {
+	header, err := bc.db.GetHeader(height, hash)
+	if err != nil {
 		return nil
 	}
-	bc.headerCache.Add(hash, blk.Header)
-	return blk.Header
+	bc.headerCache.Add(hash, header)
+	return header
 }
 
 func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {
@@ -215,16 +215,27 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 			block.Height(), last.Height()))
 	}
 	bc.blockCache.Add(block.Hash(), block)
+	bc.headerCache.Add(block.Hash(), block.Header)
 	bc.lastBlock.Store(block)
 	return nil
 }
 
 // commit persist the block to db.
-func (bc *Blockchain) CommitBlock(block *types.Block) error {
+func (bc *Blockchain) CommitBlock(batch *leveldb.Batch, block *types.Block) error {
 	// Put block to db.Batch
-	bc.db.PutBlock(tdb.GetBatch(bc.db.LDB(), block.Height()), block, false, false)
-	if err := bc.db.PutLastBlock(block.Hash()); err != nil {
-		log.Errorf("failed to put last block hash to db, err:%s", err)
+	if err := bc.db.PutBlock(batch, block, false, false); err != nil {
+		log.Errorf("failed to put block %s in db, err:%s", block.Hash(), err)
+	}
+	if err := bc.db.PutLastBlock(batch, block.Hash(), false, false); err != nil {
+		log.Errorf("failed to put last block hash %s to db, err:%s", block.Hash(), err)
+		return err
+	}
+	if err := bc.db.PutHeader(batch, block.Header, false, false); err != nil {
+		log.Errorf("failed to put header %s in db, err:%s", block.Hash(), err)
+		return err
+	}
+	if err := bc.db.PutLastHeader(batch, block.Hash(), false, false); err != nil {
+		log.Errorf("failed to put header hash %s in db, err:%s", block.Hash(), err)
 		return err
 	}
 	bc.lastFinalBlock.Store(block)

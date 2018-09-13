@@ -1,10 +1,10 @@
 package db
 
 import (
+	"strconv"
 	"tinychain/common"
 	"tinychain/core/types"
 	"tinychain/db/leveldb"
-	"strconv"
 )
 
 /*
@@ -53,8 +53,17 @@ func (tdb *TinyDB) GetLastBlock() (common.Hash, error) {
 	return common.BytesToHash(data), nil
 }
 
-func (tdb *TinyDB) PutLastBlock(hash common.Hash) error {
-	return tdb.db.Put([]byte(KeyLastBlock), hash.Bytes())
+func (tdb *TinyDB) PutLastBlock(batch *leveldb.Batch, hash common.Hash, sync, flush bool) error {
+	if err := batch.Put([]byte(KeyLastBlock), hash.Bytes()); err != nil {
+		return err
+	}
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
+	}
 	return nil
 }
 
@@ -66,10 +75,16 @@ func (tdb *TinyDB) GetLastHeader() (common.Hash, error) {
 	return common.BytesToHash(data), nil
 }
 
-func (tdb *TinyDB) PutLastHeader(hash common.Hash) error {
-	err := tdb.db.Put([]byte(KeyLastHeader), hash.Bytes())
-	if err != nil {
+func (tdb *TinyDB) PutLastHeader(batch *leveldb.Batch, hash common.Hash, sync, flush bool) error {
+	if err := batch.Put([]byte(KeyLastHeader), hash.Bytes()); err != nil {
 		return err
+	}
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
 	}
 	return nil
 }
@@ -84,10 +99,16 @@ func (tdb *TinyDB) GetHash(height uint64) (common.Hash, error) {
 	return hash, nil
 }
 
-func (tdb *TinyDB) PutHash(height uint64, hash common.Hash) error {
-	err := tdb.db.Put([]byte("h"+strconv.FormatUint(height, 10)+"n"), hash[:])
-	if err != nil {
+func (tdb *TinyDB) PutHash(batch *leveldb.Batch, height uint64, hash common.Hash, sync, flush bool) error {
+	if err := batch.Put([]byte("h"+strconv.FormatUint(height, 10)+"n"), hash[:]); err != nil {
 		return err
+	}
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
 	}
 	return nil
 }
@@ -102,33 +123,20 @@ func (tdb *TinyDB) GetHeader(height uint64, hash common.Hash) (*types.Header, er
 	return &header, nil
 }
 
-func (tdb *TinyDB) PutHeader(header *types.Header) error {
+func (tdb *TinyDB) PutHeader(batch *leveldb.Batch, header *types.Header, sync, flush bool) error {
 	data, _ := header.Serialize()
-	err := tdb.db.Put([]byte("h"+strconv.FormatUint(header.Height, 10)+header.Hash().String()), data)
-	if err != nil {
+	if err := batch.Put([]byte("h"+strconv.FormatUint(header.Height, 10)+header.Hash().String()), data); err != nil {
 		return err
+	}
+	if flush {
+		if sync {
+			return batch.Write()
+		} else {
+			go batch.Write()
+		}
 	}
 	return nil
 }
-
-//// Total difficulty
-//func (tdb *TinyDB) GetTD(height *big.Int, hash common.Hash) (*big.Int, error) {
-//	data, err := tdb.db.Get([]byte("h" + height.String() + hash.String() + "t"))
-//	if err != nil {
-//		log.Errorf("Cannot find total difficulty with height %s and hash %s", height, hash)
-//		return nil, err
-//	}
-//	return new(big.Int).SetBytes(data), nil
-//
-//}
-//func (tdb *TinyDB) PutTD(height *big.Int, hash common.Hash, td *big.Int) error {
-//	err := tdb.db.Put([]byte("h"+height.String()+hash.String()+"t"), td.Bytes())
-//	if err != nil {
-//		log.Errorf("Failed to put total difficulty with height %s and hash %s", height, hash)
-//		return err
-//	}
-//	return nil
-//}
 
 func (tdb *TinyDB) GetHeight(hash common.Hash) (uint64, error) {
 	data, err := tdb.db.Get([]byte("H" + hash.String()))
@@ -139,7 +147,9 @@ func (tdb *TinyDB) GetHeight(hash common.Hash) (uint64, error) {
 }
 
 func (tdb *TinyDB) PutHeight(batch *leveldb.Batch, hash common.Hash, height uint64, sync, flush bool) error {
-	batch.Put([]byte("H"+hash.String()), common.Uint2Bytes(height))
+	if err := batch.Put([]byte("H"+hash.String()), common.Uint2Bytes(height)); err != nil {
+		return err
+	}
 	if flush {
 		if sync {
 			return batch.Write()
@@ -164,7 +174,9 @@ func (tdb *TinyDB) PutBlock(batch *leveldb.Batch, block *types.Block, sync, flus
 	height := block.Height()
 	hash := block.Hash()
 	data, _ := block.Serialize()
-	batch.Put([]byte("b"+strconv.FormatUint(height, 10)+hash.String()), data)
+	if err := batch.Put([]byte("b"+strconv.FormatUint(height, 10)+hash.String()), data); err != nil {
+		return err
+	}
 	if flush {
 		if sync {
 			return batch.Write()
@@ -193,7 +205,10 @@ func (tdb *TinyDB) PutReceipts(batch *leveldb.Batch, height uint64, hash common.
 	if err != nil {
 		return err
 	}
-	batch.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data)
+	if err := batch.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data); err != nil {
+		return err
+	}
+
 	if flush {
 		if sync {
 			return batch.Write()

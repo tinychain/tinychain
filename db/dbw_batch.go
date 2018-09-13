@@ -49,5 +49,9 @@ func GetBatch(db *leveldb.LDBDatabase, height uint64) *leveldb.Batch {
 
 func CommitBatch(db *leveldb.LDBDatabase, height uint64) error {
 	batch := GetBatch(db, height)
-	return batch.Write()
+	if err := batch.Write(); err != nil {
+		return err
+	}
+	batchMgr.batches.Delete(height)
+	return nil
 }

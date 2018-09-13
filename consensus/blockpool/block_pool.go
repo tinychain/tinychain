@@ -118,6 +118,7 @@ func (bp *BlockPool) add(block *types.Block) error {
 	if err := bp.blValidator.ValidateHeader(block); err != nil {
 		return err
 	}
+
 	if bp.csValidator != nil {
 		if err := bp.csValidator.Validate(block); err != nil {
 			return err
