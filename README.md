@@ -35,7 +35,7 @@ The VM module is designed as pluggable modules.
 
 At step 1, we will support EVM. And in the future version, we'll implement the below virtual machine step by step:
 
-- eWasm, based on LLVM
+- [eWasm](https://github.com/ewasm/design)
 - Java VM
 
 #### Contract language
