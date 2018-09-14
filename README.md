@@ -29,6 +29,20 @@ Ed25519 is a public-key signature system with several attractive features:
 - Collision resilience
 - so on...
 
+### Smart Contract
+#### Virtual machine
+The VM module is designed as pluggable modules.
+
+At step 1, we will support EVM. And in the future version, we'll implement the below virtual machine step by step:
+
+- eWasm, based on LLVM
+- Java VM
+
+#### Contract language
+At this EVM version, developers are coding with [solidity](https://solidity.readthedocs.io/), which is widely used to develop Dapps.
+
+After implementing the virtual machine based on [WebAssembly](https://webassembly.org/), you can use any languages to write contracts.
+
 ### Database
 LevelDB
 
