@@ -12,6 +12,7 @@ import (
 	"tinychain/core/types"
 	"tinychain/event"
 	"tinychain/p2p/pb"
+	"tinychain/consensus"
 )
 
 const (
@@ -24,10 +25,6 @@ var (
 	ErrBlockFallBehind = errors.New("invalid block: block height falls behind the currnet chain")
 )
 
-type BlockValidator interface {
-	ValidateHeader(block *types.Block) error
-}
-
 // ConsensusValidator validates the consensus info field in block header
 type ConsensusValidator interface {
 	Validate(block *types.Block) error
@@ -39,7 +36,7 @@ type BlockPool struct {
 	log          *logging.Logger
 	msgType      string                  // Message type for p2p transfering
 	valid        map[uint64]types.Blocks // Valid blocks pool. map[height]*block
-	blValidator  BlockValidator
+	blValidator  consensus.BlockValidator
 	csValidator  ConsensusValidator
 	chainHeight  atomic.Value
 
@@ -51,7 +48,7 @@ type BlockPool struct {
 
 // Create a block pool instance
 // The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
-func NewBlockPool(config *common.Config, blValidator BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPool {
+func NewBlockPool(config *common.Config, blValidator consensus.BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPool {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_NUM))
 	bp := &BlockPool{
 		maxBlockSize: maxBlockSize,
@@ -115,7 +112,7 @@ func (bp *BlockPool) add(block *types.Block) error {
 	}
 
 	// Validate block
-	if err := bp.blValidator.ValidateHeader(block); err != nil {
+	if err := bp.blValidator.ValidateHeader(block.Header); err != nil {
 		return err
 	}
 

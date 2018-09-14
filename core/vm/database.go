@@ -22,8 +22,8 @@ type StateDB interface {
 	SetCode(common.Address, []byte)
 	GetCodeSize(common.Address) int
 
-	GetState(common.Address, common.Hash) common.Hash
-	SetState(common.Address, common.Hash, common.Hash)
+	GetState(common.Address, common.Hash) []byte
+	SetState(common.Address, common.Hash, []byte)
 
 	Suicide(common.Address) bool
 

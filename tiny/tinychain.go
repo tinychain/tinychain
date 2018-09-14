@@ -9,6 +9,10 @@ import (
 	"tinychain/db"
 	"tinychain/db/leveldb"
 	"tinychain/event"
+	"tinychain/consensus/solo"
+	"tinychain/consensus/pow"
+	"tinychain/consensus/vrf_bft"
+	"fmt"
 )
 
 var (
@@ -52,23 +56,37 @@ func New(config *common.Config) (*Tiny, error) {
 	}
 
 	network := NewNetwork(config)
-	engine := consensus.New()
-
 	bc, err := chain.NewBlockchain(ldb)
 	if err != nil {
 		log.Error("Failed to create blockchain")
 		return nil, err
 	}
 
-	return &Tiny{
+	tiny := &Tiny{
 		config:   config,
 		eventHub: eventHub,
 		db:       tinyDB,
 		network:  network,
 		chain:    bc,
-		engine:   engine,
 		state:    statedb,
-	}, nil
+	}
+	engineName := config.GetString(common.EngineName)
+	blockValidator := executor.NewBlockValidator(config, bc)
+	txValidator := executor.NewTxValidator(config, statedb)
+	switch engineName {
+	case common.SoloEngine:
+		tiny.engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
+	case common.PowEngine:
+		tiny.engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
+	case common.VrfBftEngine:
+		tiny.engine, err = vrf_bft.New(config)
+	default:
+		return nil, fmt.Errorf("unknown consensus engine %s", engineName)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return tiny, nil
 }
 
 func (tiny *Tiny) Start() error {

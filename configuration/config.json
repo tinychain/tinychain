@@ -1,0 +1,10 @@
+{
+  "consensus": {
+  },
+  "p2p": {
+  },
+  "txpool": {
+  },
+  "blockpool": {
+  }
+}

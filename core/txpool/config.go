@@ -14,9 +14,9 @@ type Config struct {
 
 func newConfig(config *common.Config) *Config {
 	return &Config{
-		MaxTxSize:     uint64(config.GetInt64("txpool.max_tx_size")),
-		PriceBump:     config.GetInt("txpool.price_bump"),
-		BatchTimeout:  config.GetDuration("txpool.batch_timeout"),
-		BatchCapacity: config.GetInt("txpool.batch_capacity"),
+		MaxTxSize:     uint64(config.GetInt64(common.MaxTxSize)),
+		PriceBump:     config.GetInt(common.PriceBump),
+		BatchTimeout:  config.GetDuration(common.BatchTimeout),
+		BatchCapacity: config.GetInt(common.BatchCapacity),
 	}
 }

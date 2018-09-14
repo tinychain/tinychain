@@ -10,6 +10,6 @@ type Config struct {
 
 func newConfig(config *common.Config) *Config {
 	return &Config{
-		MaxBlockSize: uint64(config.GetInt64("blockpool.max_block_size")),
+		MaxBlockSize: uint64(config.GetInt64(common.MaxBlockSize)),
 	}
 }

@@ -21,12 +21,13 @@ import (
 
 	"tinychain/common"
 	"tinychain/core/types"
+	"tinychain/core/vm"
 )
 
-func NoopCanTransfer(db StateDB, from common.Address, balance *big.Int) bool {
+func NoopCanTransfer(db vm.StateDB, from common.Address, balance *big.Int) bool {
 	return true
 }
-func NoopTransfer(db StateDB, from, to common.Address, amount *big.Int) {}
+func NoopTransfer(db vm.StateDB, from, to common.Address, amount *big.Int) {}
 
 type NoopEVMCallContext struct{}
 
@@ -57,8 +58,8 @@ func (NoopStateDB) SetCode(common.Address, []byte)                              
 func (NoopStateDB) GetCodeSize(common.Address) int                                     { return 0 }
 func (NoopStateDB) AddRefund(uint64)                                                   {}
 func (NoopStateDB) GetRefund() uint64                                                  { return 0 }
-func (NoopStateDB) GetState(common.Address, common.Hash) common.Hash                   { return common.Hash{} }
-func (NoopStateDB) SetState(common.Address, common.Hash, common.Hash)                  {}
+func (NoopStateDB) GetState(common.Address, common.Hash) []byte                        { return common.Hash{}.Bytes() }
+func (NoopStateDB) SetState(common.Address, common.Hash, []byte)                       {}
 func (NoopStateDB) Suicide(common.Address) bool                                        { return false }
 func (NoopStateDB) HasSuicided(common.Address) bool                                    { return false }
 func (NoopStateDB) Exist(common.Address) bool                                          { return false }

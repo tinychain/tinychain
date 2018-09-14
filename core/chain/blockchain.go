@@ -74,21 +74,25 @@ func (bc *Blockchain) Reset() error {
 }
 
 func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
-	if err := bc.db.PutBlock(bc.db.LDB().NewBatch(), genesis, false, true); err != nil {
+	batch := bc.db.LDB().NewBatch()
+	if err := bc.db.PutBlock(batch, genesis, false, false); err != nil {
 		log.Errorf("failed to put genesis into db, err:%s", err)
 		return err
 	}
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
-	if err := bc.db.PutLastBlock(genesis.Hash()); err != nil {
+	if err := bc.db.PutLastBlock(batch, genesis.Hash(), false, false); err != nil {
 		log.Errorf("failed to put genesis hash into db, err:%s", err)
+		return err
+	}
+	if err := batch.Write(); err != nil {
+		log.Errorf("failed to commit batch to db, err:%s", err)
 		return err
 	}
 	bc.Purge()
 	bc.blockCache.Add(genesis.Height(), genesis)
 	bc.genesis = genesis
 	bc.lastBlock.Store(genesis)
-
 	return nil
 }
 

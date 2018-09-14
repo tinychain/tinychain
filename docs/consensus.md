@@ -86,9 +86,11 @@ type Blockchain interface {
     ...
 }
 
-type BlockValidator interface{
-    ValidateHeader(b *types.Block) error
-    ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
+type BlockValidator interface {
+	ValidateHeader(header *types.Header) error
+	ValidateHeaders(headers []*types.Header) (chan struct{}, chan error)
+	ValidateBody(b *types.Block) error
+	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
 }
 
 type TxValidator interface{

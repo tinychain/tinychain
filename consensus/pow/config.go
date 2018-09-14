@@ -5,7 +5,7 @@ import (
 )
 
 type Config struct {
-	Miner     bool
+	Miner      bool
 	PrivKey    []byte
 	GasLimit   uint64
 	Difficulty uint64
@@ -14,9 +14,9 @@ type Config struct {
 func newConfig(config *common.Config) *Config {
 
 	return &Config{
-		Miner:     config.GetBool("consensus.mining"),
-		PrivKey:    []byte(config.GetString("consensus.private_key")),
-		GasLimit:   uint64(config.GetInt64("consensus.gas_limit")),
-		Difficulty: uint64(config.GetInt64("consensus.difficulty")),
+		Miner:      config.GetBool(common.IsMiner),
+		PrivKey:    []byte(config.GetString(common.ConsensusPrivKey)),
+		GasLimit:   uint64(config.GetInt64(common.BlockGasLimit)),
+		Difficulty: uint64(config.GetInt64(common.Difficulty)),
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"tinychain/core/types"
 	"tinychain/core/state"
 	"errors"
+	"tinychain/common"
 )
 
 var (
@@ -14,11 +15,11 @@ var (
 )
 
 type TxValidator struct {
-	config *Config
+	config *common.Config
 	state  *state.StateDB
 }
 
-func NewTxValidator(config *Config, state *state.StateDB) *TxValidator {
+func NewTxValidator(config *common.Config, state *state.StateDB) *TxValidator {
 	return &TxValidator{
 		config: config,
 		state:  state,

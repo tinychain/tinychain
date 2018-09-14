@@ -12,6 +12,7 @@ import (
 	"tinychain/core/types"
 	"tinychain/event"
 	"tinychain/p2p"
+	"tinychain/consensus"
 )
 
 var (
@@ -28,19 +29,10 @@ type Blockchain interface {
 	LastBlock() *types.Block
 }
 
-type BlockValidator interface {
-	ValidateHeader(b *types.Block) error
-	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
-}
-
-type TxValidator interface {
-	ValidateTx(transaction *types.Transaction) error
-}
-
 type SoloEngine struct {
 	config    *Config
 	chain     Blockchain
-	validator BlockValidator
+	validator consensus.BlockValidator
 	blockPool *blockpool.BlockPool
 	txPool    *txpool.TxPool
 	state     *state.StateDB
@@ -59,7 +51,7 @@ type SoloEngine struct {
 	commitSub    event.Subscription // listen for the commit block completed from executor
 }
 
-func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator BlockValidator, txValidator TxValidator) (*SoloEngine, error) {
+func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*SoloEngine, error) {
 	conf := newConfig(config)
 	soloEngine := &SoloEngine{
 		config:    conf,

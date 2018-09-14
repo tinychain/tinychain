@@ -12,10 +12,10 @@ type Config struct {
 func newConfig(config *common.Config) *Config {
 
 	conf := &Config{
-		PrivKey:  []byte(config.GetString("consensus.private_key")),
-		Extra:    []byte(config.GetString("consensus.extra_data")),
-		GasLimit: uint64(config.GetInt64("consensus.gas_limit")),
+		PrivKey:  []byte(config.GetString(common.ConsensusPrivKey)),
+		Extra:    []byte(config.GetString(common.ExtraData)),
+		GasLimit: uint64(config.GetInt64(common.BlockGasLimit)),
 	}
-	conf.BP = config.GetBool("consensus.isBP")
+	conf.BP = config.GetBool(common.IsBP)
 	return conf
 }

@@ -332,5 +332,5 @@ func (tp *TxPool) Run(id peer.ID, message *pb.Message) error {
 }
 
 func (tp *TxPool) Error(err error) {
-
+	log.Error(err)
 }
