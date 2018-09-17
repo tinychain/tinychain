@@ -19,8 +19,7 @@ package hexutil_test
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	"tinychain/core/vm/evm/hexutil"
 )
 
 type MyType [5]byte

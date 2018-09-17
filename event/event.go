@@ -1,10 +1,10 @@
 package event
 
 import (
-	"sync"
-	"reflect"
 	"errors"
 	"fmt"
+	"reflect"
+	"sync"
 )
 
 // ErrMuxClosed is returned when Posting on a closed TypeMux.

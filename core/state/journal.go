@@ -33,6 +33,10 @@ func (j *journal) revert(state *StateDB, snapshot int) {
 	j.entries = j.entries[:snapshot]
 }
 
+func (j *journal) delete(index int) {
+	j.entries = append(j.entries[:index], j.entries[index+1:]...)
+}
+
 func (j *journal) length() int {
 	return len(j.entries)
 }
@@ -53,8 +57,14 @@ type (
 	// Changes of the individual accounts
 	balanceChange struct {
 		Account *common.Address `json:"account"`
-		Prev    *big.Int        `json:"prev"`
+		Amount  *big.Int        `json:"amount"`
 	}
+
+	gasChange struct {
+		Account *common.Address `json:"account"`
+		Amount  uint64          `json:"amount"`
+	}
+
 	nonceChange struct {
 		Account *common.Address `json:"account"`
 		Prev    uint64          `json:"prev"`
@@ -109,11 +119,21 @@ func (ch suicideChange) serialize() ([]byte, error) {
 
 func (ch balanceChange) undo(s *StateDB) {
 	if obj := s.GetStateObj(*ch.Account); obj != nil {
-		obj.SetBalance(ch.Prev)
+		obj.AddBalance(ch.Amount)
 	}
 }
 
 func (ch balanceChange) serialize() ([]byte, error) {
+	return json.Marshal(ch)
+}
+
+func (ch gasChange) undo(s *StateDB) {
+	if obj := s.GetStateObj(*ch.Account); obj != nil {
+		obj.AddBalance(new(big.Int).SetUint64(ch.Amount))
+	}
+}
+
+func (ch gasChange) serialize() ([]byte, error) {
 	return json.Marshal(ch)
 }
 

@@ -64,6 +64,13 @@ type StateDB struct {
 }
 
 func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
+	if db == nil {
+		ldb, err := leveldb.NewLDBDataBase("/data/temp")
+		if err != nil {
+			return nil, err
+		}
+		db = ldb
+	}
 	tree := bmt.NewBucketTree(db)
 	if err := tree.Init(root); err != nil {
 		log.Errorf("Failed to init bucket tree when new state db, %s", err)
@@ -243,9 +250,10 @@ func (sdb *StateDB) GetBalance(addr common.Address) *big.Int {
 func (sdb *StateDB) SetBalance(addr common.Address, amount *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
+		prev := stateObj.Balance()
 		sdb.journal.append(balanceChange{
 			Account: &addr,
-			Prev:    stateObj.Balance(),
+			Amount:  prev.Sub(amount, prev),
 		})
 		stateObj.SetBalance(amount)
 	}
@@ -256,7 +264,7 @@ func (sdb *StateDB) AddBalance(addr common.Address, amount *big.Int) {
 	if stateObj != nil {
 		sdb.journal.append(balanceChange{
 			Account: &addr,
-			Prev:    stateObj.Balance(),
+			Amount:  amount,
 		})
 		stateObj.AddBalance(amount)
 	}
@@ -267,9 +275,20 @@ func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	if stateObj != nil {
 		sdb.journal.append(balanceChange{
 			Account: &addr,
-			Prev:    stateObj.Balance(),
+			Amount:  amount.Mul(amount, new(big.Int).SetInt64(-1)),
 		})
 		stateObj.SubBalance(amount)
+	}
+}
+
+func (sdb *StateDB) ChargeGas(addr common.Address, amount uint64) {
+	stateObj := sdb.GetStateObj(addr)
+	if stateObj != nil {
+		sdb.journal.append(gasChange{
+			Account: &addr,
+			Amount:  amount,
+		})
+		stateObj.SubBalance(new(big.Int).SetUint64(amount))
 	}
 }
 
@@ -343,7 +362,7 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 }
 
 func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
-	defer sdb.clearJournal()
+	sdb.refundGas() // refund all gas
 	dirtySet := bmt.NewWriteSet()
 
 	for addr, stateObj := range sdb.stateObjects {
@@ -380,7 +399,20 @@ func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
 		return common.Hash{}, err
 	}
 	sdb.reset() // reset state object mem cache
+	sdb.clearJournal()
 	return sdb.bmt.Hash(), nil
+}
+
+// refund applies balanceChange journals and give back all gas to original senders.
+func (sdb *StateDB) refundGas() {
+	for i := 0; i < sdb.journal.length(); i++ {
+		change := sdb.journal.entries[i]
+		if gasChange, ok := change.(gasChange); ok {
+			gasChange.undo(sdb)
+			sdb.journal.delete(i)
+			i--
+		}
+	}
 }
 
 func (sdb *StateDB) reset() {
@@ -422,6 +454,7 @@ func (sdb *StateDB) RevertToSnapshot(revid int) {
 	// Replay the journal to undo changes and remove invalid snapshots
 	sdb.journal.revert(sdb, snapshot)
 	sdb.revision = sdb.revision[:revid]
+	sdb.nextRevisionId = revid + 1
 }
 
 func (sdb *StateDB) clearJournal() {

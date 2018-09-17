@@ -9,9 +9,8 @@ import (
 )
 
 var (
-	ErrNonceTooHight    = errors.New("nonce too hight")
-	ErrNonceTooLow      = errors.New("nonce too low")
-	ErrBalanceNotEnough = errors.New("balance not enough")
+	errNonceTooHight    = errors.New("nonce too hight")
+	errBalanceNotEnough = errors.New("balance not enough")
 
 	MaxGas = uint64(9999999) // Maximum
 )
@@ -31,8 +30,8 @@ func NewStateTransition(virtualMachine vm.VM, tx *types.Transaction) *StateTrans
 }
 
 // Make state transition by applying a new event
-func ApplyTx(evm vm.VM, tx *types.Transaction) ([]byte, uint64, bool, error) {
-	return NewStateTransition(evm, tx).Process()
+func ApplyTx(virtualMachine vm.VM, tx *types.Transaction) ([]byte, uint64, bool, error) {
+	return NewStateTransition(virtualMachine, tx).Process()
 }
 
 // Check nonce is correct or not
@@ -40,9 +39,9 @@ func ApplyTx(evm vm.VM, tx *types.Transaction) ([]byte, uint64, bool, error) {
 func (st *StateTransition) preCheck() error {
 	nonce := st.statedb.GetNonce(st.tx.From)
 	if nonce < st.tx.Nonce {
-		return ErrNonceTooHight
+		return errNonceTooHight
 	} else if nonce > st.tx.Nonce {
-		return ErrNonceTooLow
+		return errNonceTooLow
 	}
 	return nil
 }
@@ -118,7 +117,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	if balance.Cmp(new(big.Int).SetUint64(gasUsed*st.gasPrice())) < 0 {
 		// TODO:balance not enough
 		log.Errorf("balance not enough for transaction %s", st.tx.Hash().Hex())
-		return nil, gasUsed, false, ErrBalanceNotEnough
+		return nil, gasUsed, false, errBalanceNotEnough
 	}
 
 	return ret, gasUsed, vmerr != nil, nil

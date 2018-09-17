@@ -258,6 +258,7 @@ func (pow *ProofOfWork) Finalize(header *types.Header, state *state.StateDB, txs
 func (pow *ProofOfWork) validateAndCommit(block *types.Block, receipts types.Receipts) error {
 	if err := pow.blValidator.ValidateState(block, pow.state, receipts); err != nil {
 		log.Errorf("invalid block state, err:%s", err)
+		pow.event.Post(&core.RollbackEvent{})
 		return err
 	}
 

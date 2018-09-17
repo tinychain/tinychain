@@ -17,9 +17,9 @@
 package event
 
 import (
+	"errors"
 	"reflect"
 	"sync"
-	"errors"
 )
 
 var (

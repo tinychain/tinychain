@@ -71,3 +71,5 @@ type ExecPendingTxEvent struct {
 }
 
 type TxBroadcastEvent struct{}
+
+type RollbackEvent struct{}

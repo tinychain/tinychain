@@ -1,19 +1,19 @@
 package txpool
 
 import (
-	"tinychain/common"
-	"tinychain/core/types"
-	"tinychain/event"
-	"sync"
-	"tinychain/core/state"
+	"encoding/json"
 	"errors"
-	"tinychain/core"
+	"github.com/libp2p/go-libp2p-peer"
 	batcher "github.com/yyh1102/go-batcher"
 	"sort"
-	"tinychain/p2p/pb"
-	"github.com/libp2p/go-libp2p-peer"
-	"encoding/json"
+	"sync"
+	"tinychain/common"
+	"tinychain/core"
+	"tinychain/core/state"
+	"tinychain/core/types"
+	"tinychain/event"
 	"tinychain/p2p"
+	"tinychain/p2p/pb"
 )
 
 var (
@@ -25,7 +25,8 @@ var (
 )
 
 type TxValidator interface {
-	ValidateTx(transaction *types.Transaction) error
+	ValidateTxs(types.Transactions) error
+	ValidateTx(*types.Transaction) error
 }
 
 type TxPool struct {
@@ -178,7 +179,7 @@ func (tp *TxPool) add(tx *types.Transaction) error {
 	}
 
 	// Validate tx
-	if err := tp.validate(tx); err != nil {
+	if err := tp.validator.ValidateTx(tx); err != nil {
 		log.Errorf("Validate tx failed, %s", err)
 		return err
 	}
@@ -303,10 +304,6 @@ func (tp *TxPool) addPending(tx *types.Transaction) error {
 		tp.all.Del(old.Hash())
 	}
 	return nil
-}
-
-func (tp *TxPool) validate(tx *types.Transaction) error {
-	return tp.validator.ValidateTx(tx)
 }
 
 func (tp *TxPool) postBatch(txs types.Transactions) {

@@ -2,7 +2,6 @@ package executor
 
 import (
 	"tinychain/common"
-	"tinychain/consensus"
 	"tinychain/core/chain"
 	"tinychain/core/state"
 	"tinychain/core/types"
@@ -18,33 +17,19 @@ const (
 	JSVM
 )
 
-type StateProcessor struct {
-	conf    *common.Config
-	bc      *chain.Blockchain
-	statedb *state.StateDB
-	engine  consensus.Engine
-}
-
-func NewStateProcessor(config *common.Config, bc *chain.Blockchain, statedb *state.StateDB, engine consensus.Engine) *StateProcessor {
-	return &StateProcessor{
-		bc:      bc,
-		statedb: statedb,
-		engine:  engine,
-		conf:    config,
-	}
-}
-
 // Process apply transaction in state
-func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
+func (ex *Executor) Process(block *types.Block) (types.Receipts, error) {
 	var (
 		receipts     types.Receipts
 		totalGasUsed uint64
 		header       = block.Header
 	)
 
+	ex.versionId = ex.state.Snapshot()
+
 	for i, tx := range block.Transactions {
-		sp.statedb.Prepare(tx.Hash(), block.Hash(), uint32(i))
-		receipt, gasUsed, err := ApplyTransaction(sp.conf, sp.bc, nil, sp.statedb, header, tx)
+		ex.state.Prepare(tx.Hash(), block.Hash(), uint32(i))
+		receipt, gasUsed, err := ex.applyTransaction(ex.conf, ex.chain, nil, ex.state, header, tx)
 		if err != nil {
 			return nil, err
 		}
@@ -56,7 +41,7 @@ func (sp *StateProcessor) Process(block *types.Block) (types.Receipts, error) {
 	return receipts, nil
 }
 
-func ApplyTransaction(cfg *common.Config, bc *chain.Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction, ) (*types.Receipt, uint64, error) {
+func (ex *Executor) applyTransaction(cfg *common.Config, bc *chain.Blockchain, author *common.Address, statedb *state.StateDB, header *types.Header, tx *types.Transaction, ) (*types.Receipt, uint64, error) {
 	// Create a new environment which holds all relevant information
 	// about the transaction and calling mechanisms
 	vmenv := newVM(cfg, tx, header, bc, author, statedb)
@@ -80,6 +65,8 @@ func ApplyTransaction(cfg *common.Config, bc *chain.Blockchain, author *common.A
 		// Create contract call
 		receipt.SetContractAddress(common.CreateAddress(tx.From, tx.Nonce))
 	}
+
+
 
 	return receipt, gasUsed, nil
 }

@@ -77,6 +77,7 @@ Tinychain中的Proof-of-work是一个常规的工作量证明共识算法，灵�
 
 ### 所有类型节点
 - `core.CommitBlockEvent` - 通知`Executor`提交区块至数据库。
+- `core.RollbackEvent` - 通知`Executor`回滚状态。
 
 # 共识引擎各组件的接口定义
 ```Go

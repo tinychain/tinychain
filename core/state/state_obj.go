@@ -103,6 +103,9 @@ func (s *stateObject) AddBalance(amount *big.Int) {
 }
 
 func (s *stateObject) SubBalance(amount *big.Int) {
+	if s.Balance().Sign() == 0 {
+		return
+	}
 	s.SetBalance(new(big.Int).Sub(s.data.Balance, amount))
 	if s.onDirty != nil {
 		s.onDirty(s.address)

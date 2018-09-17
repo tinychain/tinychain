@@ -20,12 +20,10 @@ import (
 	"math/big"
 	"strings"
 	"testing"
-
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/core/state"
-	"github.com/ethereum/go-ethereum/core/vm"
-	"github.com/ethereum/go-ethereum/ethdb"
+	"tinychain/common"
+	"tinychain/common/abi"
+	"tinychain/core/state"
+	"tinychain/core/vm/evm"
 )
 
 func TestDefaults(t *testing.T) {
@@ -64,24 +62,24 @@ func TestEVM(t *testing.T) {
 	}()
 
 	Execute([]byte{
-		byte(vm.DIFFICULTY),
-		byte(vm.TIMESTAMP),
-		byte(vm.GASLIMIT),
-		byte(vm.PUSH1),
-		byte(vm.ORIGIN),
-		byte(vm.BLOCKHASH),
-		byte(vm.COINBASE),
+		byte(evm.DIFFICULTY),
+		byte(evm.TIMESTAMP),
+		byte(evm.GASLIMIT),
+		byte(evm.PUSH1),
+		byte(evm.ORIGIN),
+		byte(evm.BLOCKHASH),
+		byte(evm.COINBASE),
 	}, nil, nil)
 }
 
 func TestExecute(t *testing.T) {
 	ret, _, err := Execute([]byte{
-		byte(vm.PUSH1), 10,
-		byte(vm.PUSH1), 0,
-		byte(vm.MSTORE),
-		byte(vm.PUSH1), 32,
-		byte(vm.PUSH1), 0,
-		byte(vm.RETURN),
+		byte(evm.PUSH1), 10,
+		byte(evm.PUSH1), 0,
+		byte(evm.MSTORE),
+		byte(evm.PUSH1), 32,
+		byte(evm.PUSH1), 0,
+		byte(evm.RETURN),
 	}, nil, nil)
 	if err != nil {
 		t.Fatal("didn't expect error", err)
@@ -94,18 +92,21 @@ func TestExecute(t *testing.T) {
 }
 
 func TestCall(t *testing.T) {
-	state, _ := state.New(common.Hash{}, state.NewDatabase(ethdb.NewMemDatabase()))
+	statedb, err := state.New(nil, nil)
+	if err != nil {
+		t.Fatal("didn't expect error", err)
+	}
 	address := common.HexToAddress("0x0a")
-	state.SetCode(address, []byte{
-		byte(vm.PUSH1), 10,
-		byte(vm.PUSH1), 0,
-		byte(vm.MSTORE),
-		byte(vm.PUSH1), 32,
-		byte(vm.PUSH1), 0,
-		byte(vm.RETURN),
+	statedb.SetCode(address, []byte{
+		byte(evm.PUSH1), 10,
+		byte(evm.PUSH1), 0,
+		byte(evm.MSTORE),
+		byte(evm.PUSH1), 32,
+		byte(evm.PUSH1), 0,
+		byte(evm.RETURN),
 	})
 
-	ret, _, err := Call(address, nil, &Config{State: state})
+	ret, _, err := Call(address, nil, &Config{State: statedb})
 	if err != nil {
 		t.Fatal("didn't expect error", err)
 	}

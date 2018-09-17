@@ -1,17 +1,20 @@
 package executor
 
 import (
-	"tinychain/core/types"
-	"tinychain/core/state"
 	"errors"
 	"tinychain/common"
+	"tinychain/core/state"
+	"tinychain/core/types"
+
+	"github.com/libp2p/go-libp2p-crypto"
 )
 
 var (
-	ErrTxTooLarge    = errors.New("oversized data")
-	ErrNegativeValue = errors.New("negative value")
-	ErrGasLimit      = errors.New("exceeds block gas limit")
-	ErrInvalidSender = errors.New("invalid sender")
+	errTxTooLarge    = errors.New("oversized data")
+	errNegativeValue = errors.New("negative value")
+	errSignMismatch  = errors.New("tx signature mismatch")
+	errNonceTooLow   = errors.New("tx nonce too low")
+	errInvalidSender = errors.New("invalid sender")
 )
 
 type TxValidator struct {
@@ -40,20 +43,56 @@ func (v *TxValidator) ValidateTxs(txs types.Transactions) (valid types.Transacti
 // Validate transaction
 // 1. check tx size
 // 2. check tx value
-// 3. check tx gas exceed the current block gas limit or not
-// 4. check address format is valid or not
-// 5. check signature
-// 6. check nonce
-// 7. check balance is enough or not for tx.Cost()
+// 3. check address is match
+// 4. check signature is match
+// 5. check nonce
+// 6. check balance is enough or not for tx.Cost()
 func (v *TxValidator) ValidateTx(tx *types.Transaction) error {
+	// Check tx size
 	if tx.Size() > types.MaxTxSize {
-		return ErrTxTooLarge
+		return errTxTooLarge
 	}
 
+	// Check tx value
 	if tx.Value.Sign() < 0 {
-		return ErrNegativeValue
+		return errNegativeValue
 	}
-	// TODO tx validates
+
+	// Decode public key
+	pubkey, err := crypto.UnmarshalPublicKey(tx.PubKey)
+	if err != nil {
+		return err
+	}
+
+	// Generate address
+	addr, err := common.GenAddrByPubkey(pubkey)
+	if err != nil {
+		return err
+	}
+
+	// Check address is match tx.From or not
+	if addr != tx.From {
+		return errInvalidSender
+	}
+
+	// Verify signature
+	match, err := pubkey.Verify(tx.Hash().Bytes(), tx.Signature)
+	if err != nil {
+		return err
+	}
+	if !match {
+		return errSignMismatch
+	}
+
+	// Check nonce
+	if nonce := v.state.GetNonce(tx.From); tx.Nonce < nonce {
+		return errNonceTooLow
+	}
+
+	// Check balance
+	if balance := v.state.GetBalance(tx.From); balance.Cmp(tx.Cost()) < 0 {
+		return errBalanceNotEnough
+	}
 
 	return nil
 }

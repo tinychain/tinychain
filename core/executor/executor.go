@@ -27,7 +27,6 @@ type Processor interface {
 type Executor struct {
 	conf      *common.Config
 	db        *db.TinyDB
-	processor Processor
 	chain     *chain.Blockchain // Blockchain wrapper
 	batch     batcher.Batch     // Batch for creating new block
 	state     *state.StateDB
@@ -36,13 +35,17 @@ type Executor struct {
 	validator *BlockValidator
 	quitCh    chan struct{}
 
-	receiptsCache sync.Map // receipts cache, map[uint64]types.Receipts
+	receiptsCache sync.Map     // Receipts cache, map[uint64]types.Receipts
+	processing    atomic.Value // Processing state, 1 means processing, 0 means idle
 
-	processing atomic.Value // Processing state, 1 means processing, 0 means idle
+	// execution context
+	gasLimit  uint64 // Block gas limit
+	versionId int    // Snapshot id
 
 	execBlockSub    event.Subscription // Subscribe new block ready event from block_pool
 	proposeBlockSub event.Subscription // Subscribe propose new block event
 	commitSub       event.Subscription // Subscribe state commit event
+	rollbackSub     event.Subscription // Subscribe rollback event
 }
 
 func New(config *common.Config, db *db.TinyDB, chain *chain.Blockchain, engine consensus.Engine) *Executor {
@@ -74,7 +77,6 @@ func (ex *Executor) Init() error {
 		return err
 	}
 	ex.state = statedb
-	ex.processor = NewStateProcessor(ex.conf, ex.chain, statedb, ex.engine)
 	return nil
 }
 
@@ -82,6 +84,7 @@ func (ex *Executor) Start() error {
 	ex.execBlockSub = ex.event.Subscribe(&core.ExecBlockEvent{})
 	ex.proposeBlockSub = ex.event.Subscribe(&core.ProposeBlockEvent{})
 	ex.commitSub = ex.event.Subscribe(&core.CommitBlockEvent{})
+	ex.rollbackSub = ex.event.Subscribe(&core.RollbackEvent{})
 
 	go ex.listen()
 	return nil
@@ -92,13 +95,22 @@ func (ex *Executor) listen() {
 		select {
 		case ev := <-ex.proposeBlockSub.Chan():
 			block := ev.(*core.ProposeBlockEvent).Block
-			go ex.proposeBlock(block)
+			if err := ex.proposeBlock(block); err != nil {
+				log.Errorf("failed to propose block #%d, err:%s", block.Height(), err)
+			}
 		case ev := <-ex.execBlockSub.Chan():
 			block := ev.(*core.ExecBlockEvent).Block
-			go ex.applyBlock(block)
+			if err := ex.applyBlock(block); err != nil {
+				log.Errorf("failed to apply block %s, err:%s", block.Hash(), err)
+			}
 		case ev := <-ex.commitSub.Chan():
 			block := ev.(*core.CommitBlockEvent).Block
-			go ex.commit(block)
+			if err := ex.commit(block); err != nil {
+				log.Errorf("failed to commit block %s, and roll back. err:%s", block.Hash(), err)
+				ex.rollback()
+			}
+		case <-ex.rollbackSub.Chan():
+			ex.rollback()
 		case <-ex.quitCh:
 			ex.proposeBlockSub.Unsubscribe()
 			ex.commitSub.Unsubscribe()
@@ -125,27 +137,6 @@ func (ex *Executor) processState() int {
 	return 0
 }
 
-//// process set a infinite loop to process block in the order of height.
-//func (ex *Executor) process() error {
-//	isProcessing := ex.processState()
-//	if isProcessing == 1 {
-//		return nil
-//	}
-//	ex.processing.Store(1)
-//	defer ex.processing.Store(0)
-//	for {
-//		nextBlk := ex.engine.BlockPool().GetBlock(ex.lastHeight() + 1)
-//		if nextBlk == nil {
-//			break
-//		}
-//		if err := ex.processBlock(nextBlk); err != nil {
-//			// TODO Roll back, and drop the future blocks
-//			return err
-//		}
-//	}
-//	return nil
-//}
-
 // Validate validate block body.
 func (ex *Executor) validate(block *types.Block) error {
 	return ex.validator.ValidateBody(block)
@@ -161,7 +152,7 @@ func (ex *Executor) applyBlock(block *types.Block) error {
 		return fmt.Errorf("block height is not match, demand #%d, got #%d", currHeight+1, block.Height())
 	}
 	ex.state.UpdateCurrHeight(block.Height())
-	receipts, err := ex.execBlock(block)
+	receipts, err := ex.Process(block)
 	if err != nil {
 		log.Errorf("failed to execute block #%d, err:%s", block.Height(), err)
 		return err
@@ -194,7 +185,7 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 	}
 
 	ex.state.UpdateCurrHeight(block.Height())
-	receipts, err := ex.execBlock(block)
+	receipts, err := ex.Process(block)
 	if err != nil {
 		log.Errorf("failed to exec block #%d, err:%s", block.Height(), err)
 		return err
@@ -219,7 +210,6 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 	return nil
 }
 
-// execBlock process block in state
-func (ex *Executor) execBlock(block *types.Block) (types.Receipts, error) {
-	return ex.processor.Process(block)
+func (ex *Executor) rollback() {
+	ex.state.RevertToSnapshot(ex.versionId)
 }

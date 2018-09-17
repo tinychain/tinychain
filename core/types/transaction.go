@@ -1,14 +1,15 @@
 package types
 
 import (
+	"errors"
 	"math/big"
 	"sync/atomic"
 	"tinychain/common"
-	json "github.com/json-iterator/go"
-	"github.com/libp2p/go-libp2p-crypto"
-	"errors"
 	"tinychain/core/bmt"
 	"tinychain/db/leveldb"
+
+	json "github.com/json-iterator/go"
+	"github.com/libp2p/go-libp2p-crypto"
 )
 
 const (

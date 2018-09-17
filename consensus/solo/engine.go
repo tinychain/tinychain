@@ -5,6 +5,7 @@ import (
 	"math/big"
 	"time"
 	"tinychain/common"
+	"tinychain/consensus"
 	"tinychain/consensus/blockpool"
 	"tinychain/core"
 	"tinychain/core/state"
@@ -12,7 +13,6 @@ import (
 	"tinychain/core/types"
 	"tinychain/event"
 	"tinychain/p2p"
-	"tinychain/consensus"
 )
 
 var (
@@ -198,6 +198,7 @@ func (solo *SoloEngine) Finalize(header *types.Header, state *state.StateDB, txs
 func (solo *SoloEngine) validateAndCommit(block *types.Block, receipts types.Receipts) error {
 	if err := solo.validator.ValidateState(block, solo.state, receipts); err != nil {
 		log.Errorf("invalid block state, err:%s", err)
+		solo.event.Post(&core.RollbackEvent{})
 		return err
 	}
 	solo.commit(block)

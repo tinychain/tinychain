@@ -77,6 +77,7 @@ Some event types used by consensus engine are introduced below(can be more):
 
 ### Both
 - `core.CommitBlockEvent` - notify `Executor` to commit blocks to database.
+- `core.RollbackEvent` - notify `Executor` to roll back state.
 
 # Interface of components in consensus engine
 ```Go

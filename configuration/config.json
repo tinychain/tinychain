@@ -2,6 +2,10 @@
   "consensus": {
   },
   "p2p": {
+    "port": 65535,
+    "seeds": [],
+    "routeFile": "",
+    "privKey": ""
   },
   "txpool": {
   },
