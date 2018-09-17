@@ -25,6 +25,8 @@ type StateDB interface {
 	GetState(common.Address, common.Hash) []byte
 	SetState(common.Address, common.Hash, []byte)
 
+	ChargeGas(common.Address, uint64)
+
 	Suicide(common.Address) bool
 
 	// Exist reports whether the given account exists in state.

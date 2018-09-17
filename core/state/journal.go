@@ -119,7 +119,7 @@ func (ch suicideChange) serialize() ([]byte, error) {
 
 func (ch balanceChange) undo(s *StateDB) {
 	if obj := s.GetStateObj(*ch.Account); obj != nil {
-		obj.AddBalance(ch.Amount)
+		obj.SubBalance(ch.Amount)
 	}
 }
 

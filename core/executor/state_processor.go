@@ -12,7 +12,7 @@ import (
 type vmType int
 
 const (
-	EVM vmType = iota
+	EVM   vmType = iota
 	EWASM
 	JSVM
 )
@@ -65,8 +65,6 @@ func (ex *Executor) applyTransaction(cfg *common.Config, bc *chain.Blockchain, a
 		// Create contract call
 		receipt.SetContractAddress(common.CreateAddress(tx.From, tx.Nonce))
 	}
-
-
 
 	return receipt, gasUsed, nil
 }

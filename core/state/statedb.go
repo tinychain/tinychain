@@ -247,15 +247,15 @@ func (sdb *StateDB) GetBalance(addr common.Address) *big.Int {
 	return nil
 }
 
-func (sdb *StateDB) SetBalance(addr common.Address, amount *big.Int) {
+func (sdb *StateDB) SetBalance(addr common.Address, target *big.Int) {
 	stateObj := sdb.GetOrNewStateObj(addr)
 	if stateObj != nil {
 		prev := stateObj.Balance()
 		sdb.journal.append(balanceChange{
 			Account: &addr,
-			Amount:  prev.Sub(amount, prev),
+			Amount:  prev.Sub(target, prev),
 		})
-		stateObj.SetBalance(amount)
+		stateObj.SetBalance(target)
 	}
 }
 
@@ -281,6 +281,10 @@ func (sdb *StateDB) SubBalance(addr common.Address, amount *big.Int) {
 	}
 }
 
+// ChargeGas charge a given address as gas during the transaction execution,
+// but will give back at the state commit process.
+// This mechanism is make free transactions possible and defend sending huge amount of transactions
+// from the same address viciously.
 func (sdb *StateDB) ChargeGas(addr common.Address, amount uint64) {
 	stateObj := sdb.GetStateObj(addr)
 	if stateObj != nil {

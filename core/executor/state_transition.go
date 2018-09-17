@@ -19,6 +19,7 @@ type StateTransition struct {
 	tx      *types.Transaction // state transition event
 	vm      vm.VM
 	statedb vm.StateDB
+	gasPool *GasPool
 }
 
 func NewStateTransition(virtualMachine vm.VM, tx *types.Transaction) *StateTransition {
@@ -26,6 +27,7 @@ func NewStateTransition(virtualMachine vm.VM, tx *types.Transaction) *StateTrans
 		vm:      virtualMachine,
 		tx:      tx,
 		statedb: virtualMachine.DB(),
+		gasPool: new(GasPool),
 	}
 }
 
@@ -43,7 +45,7 @@ func (st *StateTransition) preCheck() error {
 	} else if nonce > st.tx.Nonce {
 		return errNonceTooLow
 	}
-	return nil
+	return st.buyGas()
 }
 
 func (st *StateTransition) from() evm.AccountRef {
@@ -59,13 +61,7 @@ func (st *StateTransition) to() evm.AccountRef {
 		return evm.AccountRef{}
 	}
 
-	if st.tx.To.Nil() {
-		return evm.AccountRef{}
-	}
 	to := st.tx.To
-	//if !st.statedb.Exist(to) {
-	//	st.statedb.CreateAccount(to)
-	//}
 	return evm.AccountRef(to)
 }
 
@@ -79,6 +75,22 @@ func (st *StateTransition) gas() uint64 {
 
 func (st *StateTransition) gasPrice() uint64 {
 	return st.tx.GasPrice
+}
+
+func (st *StateTransition) buyGas() error {
+	maxGasUsed := st.gas() * st.gasPrice()
+	if balance := st.statedb.GetBalance(st.from().Address()); balance.Cmp(new(big.Int).SetUint64(maxGasUsed)) < 0 {
+		log.Errorf("balance not enough for transaction %s", st.tx.Hash().Hex())
+		return errBalanceNotEnough
+	}
+	st.statedb.ChargeGas(st.tx.From, maxGasUsed)
+	st.gasPool.AddGas(maxGasUsed)
+	return nil
+}
+
+// refundGas gives the remaining gas in gasPool back to the account of sender
+func (st *StateTransition) refundGas() {
+	st.statedb.AddBalance(st.from().Address(), new(big.Int).SetUint64(st.gasPool.Gas()))
 }
 
 func (st *StateTransition) value() *big.Int {
@@ -96,7 +108,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 		ret     []byte
 		leftGas uint64
 	)
-	if (st.to() == evm.AccountRef{}) {
+	if st.to().Address().Nil() {
 		// Contract create
 		ret, _, leftGas, vmerr = st.vm.Create(st.to(), st.data(), st.gas(), st.value())
 	} else {
@@ -111,14 +123,8 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 		}
 	}
 	gasUsed := st.gas() - leftGas
-	//st.statedb.SubBalance(st.from().Address(), new(big.Int).SetUint64(gasUsed))
-	//st.statedb.AddBalance(st.evm.Coinbase, new(big.Int).SetUint64(gasUsed))
-	balance := st.statedb.GetBalance(st.from().Address())
-	if balance.Cmp(new(big.Int).SetUint64(gasUsed*st.gasPrice())) < 0 {
-		// TODO:balance not enough
-		log.Errorf("balance not enough for transaction %s", st.tx.Hash().Hex())
-		return nil, gasUsed, false, errBalanceNotEnough
-	}
+	st.gasPool.SubGas(gasUsed * st.gasPrice())
+	st.refundGas()
 
 	return ret, gasUsed, vmerr != nil, nil
 }
