@@ -42,6 +42,7 @@ func (ex *Executor) commit(block *types.Block) error {
 	go ex.event.Post(&core.CommitCompleteEvent{
 		Block: block,
 	})
+	ex.resetVersion()
 	return nil
 }
 

@@ -25,8 +25,6 @@ func (ex *Executor) Process(block *types.Block) (types.Receipts, error) {
 		header       = block.Header
 	)
 
-	ex.versionId = ex.state.Snapshot()
-
 	for i, tx := range block.Transactions {
 		ex.state.Prepare(tx.Hash(), block.Hash(), uint32(i))
 		receipt, gasUsed, err := ex.applyTransaction(ex.conf, ex.chain, nil, ex.state, header, tx)

@@ -49,6 +49,7 @@ type SoloEngine struct {
 	consensusSub event.Subscription // listen for the new proposed block executed by executor
 	receiptsSub  event.Subscription // listen for the receipts after executing
 	commitSub    event.Subscription // listen for the commit block completed from executor
+	errSub       event.Subscription // listen for the executor's error event
 }
 
 func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*SoloEngine, error) {
@@ -107,13 +108,20 @@ func (solo *SoloEngine) listen() {
 		case ev := <-solo.consensusSub.Chan():
 			// this channel will be passed when executor completes to propose block,
 			// and always done by bp
-			block := ev.(*core.ConsensusEvent).Block
-			go solo.commit(block)
+			event := ev.(*core.ConsensusEvent)
+			go solo.validateAndCommit(event.Block, event.Receipts)
 		case ev := <-solo.receiptsSub.Chan():
 			// this channel will be passed when executor completes to process block and ge receipts,
 			// and always done by not-bp
 			rev := ev.(*core.NewReceiptsEvent)
 			go solo.validateAndCommit(rev.Block, rev.Receipts)
+		case ev := <-solo.errSub.Chan():
+			err := ev.(*core.ErrOccurEvent).Err
+			log.Errorf("error occurs at executor processing: %s", err)
+			solo.processLock <- struct{}{}
+			if !solo.config.BP {
+				go solo.process()
+			}
 		case <-solo.quitCh:
 			solo.newTxsSub.Unsubscribe()
 			solo.newBlockSub.Unsubscribe()
@@ -162,7 +170,6 @@ func (solo *SoloEngine) proposeBlock(txs types.Transactions) {
 	block := types.NewBlock(header, txs)
 	go solo.event.Post(&core.ProposeBlockEvent{block})
 	log.Infof("Block producer %s propose a new block, height = #%d", solo.Address(), block.Height())
-	solo.processLock <- struct{}{}
 }
 
 func (solo *SoloEngine) broadcast(block *types.Block) error {
@@ -198,7 +205,7 @@ func (solo *SoloEngine) Finalize(header *types.Header, state *state.StateDB, txs
 func (solo *SoloEngine) validateAndCommit(block *types.Block, receipts types.Receipts) error {
 	if err := solo.validator.ValidateState(block, solo.state, receipts); err != nil {
 		log.Errorf("invalid block state, err:%s", err)
-		solo.event.Post(&core.RollbackEvent{})
+		go solo.event.Post(&core.RollbackEvent{})
 		solo.processLock <- struct{}{}
 		return err
 	}

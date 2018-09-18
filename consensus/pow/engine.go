@@ -7,7 +7,6 @@ import (
 	"math"
 	"math/big"
 	"runtime"
-	"sync"
 	"sync/atomic"
 	"time"
 	"tinychain/common"
@@ -69,6 +68,7 @@ type ProofOfWork struct {
 	newBlockSub  event.Subscription // listen for the new block from block pool
 	commitSub    event.Subscription // listen for the commit block completed from executor
 	receiptsSub  event.Subscription // listen for the receipts executed by executor
+	errSub       event.Subscription // listen for the executor's error event
 }
 
 func New(config *common.Config, state *state.StateDB, chain consensus.Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*ProofOfWork, error) {
@@ -111,6 +111,7 @@ func (pow *ProofOfWork) Start() error {
 	pow.commitSub = pow.event.Subscribe(&core.CommitCompleteEvent{})
 	pow.receiptsSub = pow.event.Subscribe(&core.NewReceiptsEvent{})
 	pow.newBlockSub = pow.event.Subscribe(&core.BlockReadyEvent{})
+	pow.errSub = pow.event.Subscribe(&core.ErrOccurEvent{})
 
 	go pow.listen()
 	return nil
@@ -120,8 +121,8 @@ func (pow *ProofOfWork) listen() {
 	for {
 		select {
 		case ev := <-pow.consensusSub.Chan():
-			block := ev.(*core.ConsensusEvent).Block
-			go pow.commit(block)
+			event := ev.(*core.ConsensusEvent)
+			go pow.seal(event.Block, event.Receipts)
 		case <-pow.newBlockSub.Chan():
 			go pow.process()
 		case ev := <-pow.receiptsSub.Chan():
@@ -130,6 +131,11 @@ func (pow *ProofOfWork) listen() {
 		case ev := <-pow.commitSub.Chan():
 			block := ev.(*core.CommitCompleteEvent).Block
 			go pow.commitComplete(block)
+		case ev := <-pow.errSub.Chan():
+			err := ev.(*core.ErrOccurEvent).Err
+			log.Errorf("error occurs at executor process: %s", err)
+			pow.processLock <- struct{}{}
+			go pow.process()
 		case <-pow.quitCh:
 			pow.consensusSub.Unsubscribe()
 			return
@@ -172,16 +178,23 @@ func (pow *ProofOfWork) proposeBlock() {
 	}
 
 	block := types.NewBlock(header, pow.txPool.Pending())
-	pow.run(block)
 	log.Infof("Block producer %s propose a new block, height = #%d", pow.Addr(), block.Height())
+	go pow.event.Post(&core.ProposeBlockEvent{block})
 }
 
 func (pow *ProofOfWork) process() {
-	<-pow.processLock
 	block := pow.blockPool.GetBlock(pow.chain.LastBlock().Height() + 1)
-	if pow.currMiningHeader != nil && pow.currMiningHeader.Height == block.Height() {
-		pow.mineStopCh <- struct{}{}
+	if block == nil {
+		return
 	}
+	if pow.currMiningHeader != nil && pow.currMiningHeader.Height == block.Height() {
+		if err := pow.csValidator.Validate(block); err == nil {
+			pow.mineStopCh <- struct{}{}
+		} else {
+			return
+		}
+	}
+	<-pow.processLock
 	if block != nil {
 		go pow.event.Post(&core.ExecBlockEvent{block})
 	} else {
@@ -215,6 +228,7 @@ func (pow *ProofOfWork) run(block *types.Block) error {
 	case <-pow.mineStopCh:
 		// close all mining work
 		close(abort)
+		pow.processLock <- struct{}{}
 		return fmt.Errorf("stop mining, a block with the same height #%d found", block.Height())
 	}
 
@@ -228,7 +242,6 @@ func (pow *ProofOfWork) run(block *types.Block) error {
 	}
 	block.Header.ConsensusInfo = data
 	pow.currMiningHeader = nil
-	go pow.event.Post(&core.ProposeBlockEvent{block})
 	return nil
 }
 
@@ -254,11 +267,20 @@ func (pow *ProofOfWork) Finalize(header *types.Header, state *state.StateDB, txs
 	return newBlk, nil
 }
 
+func (pow *ProofOfWork) seal(block *types.Block, receipts types.Receipts) error {
+	if err := pow.run(block); err != nil {
+		go pow.event.Post(&core.RollbackEvent{})
+		return err
+	}
+
+	return pow.validateAndCommit(block, receipts)
+}
+
 // validateAndCommit validate block's state and consensus info, and finally commit it.
 func (pow *ProofOfWork) validateAndCommit(block *types.Block, receipts types.Receipts) error {
 	if err := pow.blValidator.ValidateState(block, pow.state, receipts); err != nil {
 		log.Errorf("invalid block state, err:%s", err)
-		pow.event.Post(&core.RollbackEvent{})
+		go pow.event.Post(&core.RollbackEvent{})
 		return err
 	}
 
@@ -324,31 +346,6 @@ func (pow *ProofOfWork) adjustDiff() (uint64, error) {
 	return newDiff, nil
 }
 
-type nonceChan struct {
-	mu     sync.RWMutex
-	closed bool
-	ch     chan uint64
-}
-
-func newNonceChan() *nonceChan {
-	return &nonceChan{
-		ch: make(chan uint64, 1),
-	}
-}
-
-func (nc *nonceChan) post(nonce uint64) {
-	nc.mu.RLock()
-	defer nc.mu.RUnlock()
-	if !nc.closed {
-		nc.ch <- nonce
-	}
-}
-
-func (nc *nonceChan) close() {
-	nc.mu.Lock()
-	defer nc.mu.Unlock()
-	if !nc.closed {
-		nc.closed = true
-		close(nc.ch)
-	}
+func (pow *ProofOfWork) rollback() {
+	pow.event.Post(&core.RollbackEvent{})
 }

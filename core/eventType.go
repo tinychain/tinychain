@@ -37,7 +37,8 @@ type ProposeBlockEvent struct {
 // ConsensusEvent will be posted after a new block proposed by the BP
 // completed execution without errors
 type ConsensusEvent struct {
-	Block *types.Block
+	Block    *types.Block
+	Receipts types.Receipts
 }
 
 type CommitBlockEvent struct {
@@ -53,6 +54,11 @@ type CommitCompleteEvent struct {
 type NewReceiptsEvent struct {
 	Block    *types.Block
 	Receipts types.Receipts
+}
+
+// ErrOccurEvent will be posted when some errors occur during executor processing.
+type ErrOccurEvent struct {
+	Err error
 }
 
 /*

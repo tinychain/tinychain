@@ -97,16 +97,21 @@ func (ex *Executor) listen() {
 			block := ev.(*core.ProposeBlockEvent).Block
 			if err := ex.proposeBlock(block); err != nil {
 				log.Errorf("failed to propose block #%d, err:%s", block.Height(), err)
+				go ex.event.Post(&core.ErrOccurEvent{err})
+				ex.rollback()
 			}
 		case ev := <-ex.execBlockSub.Chan():
 			block := ev.(*core.ExecBlockEvent).Block
 			if err := ex.applyBlock(block); err != nil {
 				log.Errorf("failed to apply block %s, err:%s", block.Hash(), err)
+				go ex.event.Post(&core.ErrOccurEvent{err})
+				ex.rollback()
 			}
 		case ev := <-ex.commitSub.Chan():
 			block := ev.(*core.CommitBlockEvent).Block
 			if err := ex.commit(block); err != nil {
 				log.Errorf("failed to commit block %s, and roll back. err:%s", block.Hash(), err)
+				go ex.event.Post(&core.ErrOccurEvent{err})
 				ex.rollback()
 			}
 		case <-ex.rollbackSub.Chan():
@@ -144,6 +149,8 @@ func (ex *Executor) validate(block *types.Block) error {
 
 // applyBlockBlock process the validation and execute the received block.
 func (ex *Executor) applyBlock(block *types.Block) error {
+	ex.versionId = ex.state.Snapshot()
+
 	if err := ex.validate(block); err != nil {
 		log.Errorf("block is invalid, %s", err)
 		return err
@@ -155,6 +162,7 @@ func (ex *Executor) applyBlock(block *types.Block) error {
 	receipts, err := ex.Process(block)
 	if err != nil {
 		log.Errorf("failed to execute block #%d, err:%s", block.Height(), err)
+		ex.rollback()
 		return err
 	}
 
@@ -179,6 +187,8 @@ func (ex *Executor) applyBlock(block *types.Block) error {
 // proposeBlock executes new transactions from tx_pool and pack a new block.
 // The new block is created by consensus engine and does not include state_root, tx_root and receipts_root.
 func (ex *Executor) proposeBlock(block *types.Block) error {
+	ex.versionId = ex.state.Snapshot()
+
 	if err := ex.validate(block); err != nil {
 		log.Errorf("block is invalid, %s", err)
 		return err
@@ -206,10 +216,18 @@ func (ex *Executor) proposeBlock(block *types.Block) error {
 		return err
 	}
 
-	go ex.event.Post(&core.ConsensusEvent{newBlk})
+	go ex.event.Post(&core.ConsensusEvent{newBlk, receipts})
 	return nil
 }
 
+func (ex *Executor) resetVersion() {
+	ex.versionId = -1
+}
+
 func (ex *Executor) rollback() {
+	if ex.versionId == -1 {
+		return
+	}
 	ex.state.RevertToSnapshot(ex.versionId)
+	ex.versionId = -1
 }
