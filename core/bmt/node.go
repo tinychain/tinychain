@@ -4,7 +4,7 @@ import (
 	json "github.com/json-iterator/go"
 	"sync"
 	"tinychain/common"
-	"tinychain/db/leveldb"
+	"tinychain/db"
 )
 
 type Position struct {
@@ -88,7 +88,7 @@ func (node *MerkleNode) computeHash() (common.Hash, error) {
 	return node.H, nil
 }
 
-func (node *MerkleNode) commit(batch *leveldb.Batch) error {
+func (node *MerkleNode) commit(batch db.Batch) error {
 	if node.db == nil {
 		return ErrDbNotOpen
 	}

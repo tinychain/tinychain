@@ -20,6 +20,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"math/big"
+	"tinychain/core/vm"
 
 	"golang.org/x/crypto/ripemd160"
 	"tinychain/common"
@@ -80,7 +81,7 @@ func RunPrecompiledContract(p PrecompiledContract, input []byte, contract *Contr
 	if contract.UseGas(gas) {
 		return p.Run(input)
 	}
-	return nil, ErrOutOfGas
+	return nil, vm.ErrOutOfGas
 }
 
 // ECRECOVER implemented as a native contract.

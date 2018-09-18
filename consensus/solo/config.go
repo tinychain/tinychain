@@ -16,6 +16,6 @@ func newConfig(config *common.Config) *Config {
 		Extra:    []byte(config.GetString(common.ExtraData)),
 		GasLimit: uint64(config.GetInt64(common.BlockGasLimit)),
 	}
-	conf.BP = config.GetBool(common.IsBP)
+	conf.BP = config.GetBool(common.IsMiner)
 	return conf
 }

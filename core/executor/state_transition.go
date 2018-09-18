@@ -11,8 +11,6 @@ import (
 var (
 	errNonceTooHight    = errors.New("nonce too hight")
 	errBalanceNotEnough = errors.New("balance not enough")
-
-	MaxGas = uint64(9999999) // Maximum
 )
 
 type StateTransition struct {
@@ -84,7 +82,7 @@ func (st *StateTransition) buyGas() error {
 		return errBalanceNotEnough
 	}
 	st.statedb.ChargeGas(st.tx.From, maxGasUsed)
-	st.gasPool.AddGas(maxGasUsed)
+	st.gasPool.AddGas(st.gas())
 	return nil
 }
 
@@ -103,6 +101,7 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 		return nil, 0, false, err
 	}
 
+	defer st.refundGas()
 	var (
 		vmerr   error
 		ret     []byte
@@ -118,13 +117,12 @@ func (st *StateTransition) Process() ([]byte, uint64, bool, error) {
 	}
 	if vmerr != nil {
 		log.Errorf("VM returned with error %s", vmerr)
-		if vmerr == evm.ErrInsufficientBalance {
+		if vmerr == vm.ErrInsufficientBalance {
 			return nil, 0, false, vmerr
 		}
 	}
 	gasUsed := st.gas() - leftGas
-	st.gasPool.SubGas(gasUsed * st.gasPrice())
-	st.refundGas()
+	st.gasPool.SubGas(gasUsed)
 
 	return ret, gasUsed, vmerr != nil, nil
 }

@@ -9,7 +9,7 @@ import (
 	"tinychain/core/bmt"
 	"tinychain/core/chain"
 	"tinychain/core/types"
-	"tinychain/db/leveldb"
+	tdb "tinychain/db"
 )
 
 const (
@@ -26,7 +26,7 @@ type BucketTree interface {
 	Init(root []byte) error
 	Prepare(dirty bmt.WriteSet) error
 	Process() (common.Hash, error)
-	Commit(batch *leveldb.Batch) error
+	Commit(batch tdb.Batch) error
 	Get(key []byte) ([]byte, error)
 	Copy() *bmt.BucketTree
 	Purge()
@@ -63,9 +63,9 @@ type StateDB struct {
 	txStat
 }
 
-func New(db *leveldb.LDBDatabase, root []byte) (*StateDB, error) {
+func New(db tdb.Database, root []byte) (*StateDB, error) {
 	if db == nil {
-		ldb, err := leveldb.NewLDBDataBase("/data/temp")
+		ldb, err := tdb.NewLDBDataBase("/data/temp")
 		if err != nil {
 			return nil, err
 		}
@@ -343,6 +343,14 @@ func (sdb *StateDB) Suicide(addr common.Address) bool {
 	return true
 }
 
+func (sdb *StateDB) HasSuicided(addr common.Address) bool {
+	stateObj := sdb.GetStateObj(addr)
+	if stateObj != nil {
+		return stateObj.suicided
+	}
+	return false
+}
+
 func (sdb *StateDB) Empty(addr common.Address) bool {
 	obj := sdb.GetStateObj(addr)
 	if obj != nil {
@@ -365,7 +373,7 @@ func (sdb *StateDB) IntermediateRoot() (common.Hash, error) {
 	return sdb.bmt.Process()
 }
 
-func (sdb *StateDB) Commit(batch *leveldb.Batch) (common.Hash, error) {
+func (sdb *StateDB) Commit(batch tdb.Batch) (common.Hash, error) {
 	sdb.refundGas() // refund all gas
 	dirtySet := bmt.NewWriteSet()
 

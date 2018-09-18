@@ -61,7 +61,7 @@ func run(evm *EVM, contract *Contract, input []byte) ([]byte, error) {
 			return interpreter.Run(contract, input)
 		}
 	}
-	return nil, ErrNoCompatibleInterpreter
+	return nil, vm.ErrNoCompatibleInterpreter
 }
 
 // EVM is the Ethereum Virtual Machine base object and provides
@@ -143,11 +143,11 @@ func (evm *EVM) Call(caller vm.ContractRef, addr common.Address, input []byte, g
 
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(CallCreateDepth) {
-		return nil, gas, ErrDepth
+		return nil, gas, vm.ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
 	if !evm.Context.CanTransfer(evm.StateDB, caller.Address(), value) {
-		return nil, gas, ErrInsufficientBalance
+		return nil, gas, vm.ErrInsufficientBalance
 	}
 
 	var (
@@ -211,11 +211,11 @@ func (evm *EVM) CallCode(caller vm.ContractRef, addr common.Address, input []byt
 
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(CallCreateDepth) {
-		return nil, gas, ErrDepth
+		return nil, gas, vm.ErrDepth
 	}
 	// Fail if we're trying to transfer more than the available balance
 	if !evm.CanTransfer(evm.StateDB, caller.Address(), value) {
-		return nil, gas, ErrInsufficientBalance
+		return nil, gas, vm.ErrInsufficientBalance
 	}
 
 	var (
@@ -249,7 +249,7 @@ func (evm *EVM) DelegateCall(caller vm.ContractRef, addr common.Address, input [
 	}
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(CallCreateDepth) {
-		return nil, gas, ErrDepth
+		return nil, gas, vm.ErrDepth
 	}
 
 	var (
@@ -281,7 +281,7 @@ func (evm *EVM) StaticCall(caller vm.ContractRef, addr common.Address, input []b
 	}
 	// Fail if we're trying to execute above the call depth limit
 	if evm.depth > int(CallCreateDepth) {
-		return nil, gas, ErrDepth
+		return nil, gas, vm.ErrDepth
 	}
 	// Make sure the readonly is only set if we aren't in readonly yet
 	// this makes also sure that the readonly flag isn't removed for
@@ -319,10 +319,10 @@ func (evm *EVM) create(caller vm.ContractRef, code []byte, gas uint64, value *bi
 	// Depth check execution. Fail if we're trying to execute above the
 	// limit.
 	if evm.depth > int(CallCreateDepth) {
-		return nil, common.Address{}, gas, ErrDepth
+		return nil, common.Address{}, gas, vm.ErrDepth
 	}
 	if !evm.CanTransfer(evm.StateDB, caller.Address(), value) {
-		return nil, common.Address{}, gas, ErrInsufficientBalance
+		return nil, common.Address{}, gas, vm.ErrInsufficientBalance
 	}
 	nonce := evm.StateDB.GetNonce(caller.Address())
 	evm.StateDB.SetNonce(caller.Address(), nonce+1)
@@ -330,7 +330,7 @@ func (evm *EVM) create(caller vm.ContractRef, code []byte, gas uint64, value *bi
 	// Ensure there's no existing contract already at the designated address
 	contractHash := evm.StateDB.GetCodeHash(address)
 	if evm.StateDB.GetNonce(address) != 0 || (contractHash != (common.Hash{}) && contractHash != emptyCodeHash) {
-		return nil, common.Address{}, 0, ErrContractAddressCollision
+		return nil, common.Address{}, 0, vm.ErrContractAddressCollision
 	}
 	// Create a new account on the state
 	snapshot := evm.StateDB.Snapshot()
@@ -366,14 +366,14 @@ func (evm *EVM) create(caller vm.ContractRef, code []byte, gas uint64, value *bi
 		if contract.UseGas(createDataGas) {
 			evm.StateDB.SetCode(address, ret)
 		} else {
-			err = ErrCodeStoreOutOfGas
+			err = vm.ErrCodeStoreOutOfGas
 		}
 	}
 
 	// When an error was returned by the EVM or when setting the creation code
 	// above we revert to the snapshot and consume any gas remaining. Additionally
 	// when we're in homestead this also counts for code storage gas errors.
-	if maxCodeSizeExceeded || (err != nil && err != ErrCodeStoreOutOfGas) {
+	if maxCodeSizeExceeded || (err != nil && err != vm.ErrCodeStoreOutOfGas) {
 		evm.StateDB.RevertToSnapshot(snapshot)
 		if err != errExecutionReverted {
 			contract.UseGas(contract.Gas)

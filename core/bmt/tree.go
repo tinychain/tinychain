@@ -2,11 +2,11 @@
 package bmt
 
 import (
+	"bytes"
 	"errors"
 	"sync"
 	"tinychain/common"
-	"tinychain/db/leveldb"
-	"bytes"
+	tdb "tinychain/db"
 )
 
 var (
@@ -36,7 +36,7 @@ type BucketTree struct {
 	dirty      bool
 }
 
-func NewBucketTree(db *leveldb.LDBDatabase) *BucketTree {
+func NewBucketTree(db tdb.Database) *BucketTree {
 	// v1.0
 	return &BucketTree{
 		Capacity:   defaultHashTableCap,
@@ -191,7 +191,7 @@ func (bt *BucketTree) processNodes() error {
 // commit commits all data in memory to db.Batch.
 // At this time, data is not really stored in db, so you should
 // explicitly invoke batch.Write().
-func (bt *BucketTree) Commit(batch *leveldb.Batch) error {
+func (bt *BucketTree) Commit(batch tdb.Batch) error {
 	if bt.db == nil {
 		return ErrDbNotOpen
 	}
@@ -225,7 +225,7 @@ func (bt *BucketTree) Commit(batch *leveldb.Batch) error {
 }
 
 // Commit node store
-func (bt *BucketTree) commitNode(batch *leveldb.Batch, node *MerkleNode) error {
+func (bt *BucketTree) commitNode(batch tdb.Batch, node *MerkleNode) error {
 	if node == nil {
 		return nil
 	}
@@ -282,7 +282,7 @@ func Hash(set WriteSet) (common.Hash, error) {
 	return root, nil
 }
 
-func Commit(set WriteSet, db *leveldb.LDBDatabase) error {
+func Commit(set WriteSet, db tdb.Database) error {
 	tree := NewBucketTree(db)
 	tree.Init(nil)
 	tree.Prepare(set)

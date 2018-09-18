@@ -1,8 +1,8 @@
 package bmt
 
 import (
-	"tinychain/db/leveldb"
 	"tinychain/common"
+	tdb "tinychain/db"
 )
 
 const (
@@ -12,10 +12,10 @@ const (
 )
 
 type BmtDB struct {
-	db *leveldb.LDBDatabase
+	db tdb.Database
 }
 
-func NewBmtDB(db *leveldb.LDBDatabase) *BmtDB {
+func NewBmtDB(db tdb.Database) *BmtDB {
 	return &BmtDB{
 		db: db,
 	}
@@ -32,7 +32,7 @@ func (bdb *BmtDB) GetNode(key common.Hash) (*MerkleNode, error) {
 	return node, nil
 }
 
-func (bdb *BmtDB) PutNode(batch *leveldb.Batch, key common.Hash, node *MerkleNode) error {
+func (bdb *BmtDB) PutNode(batch tdb.Batch, key common.Hash, node *MerkleNode) error {
 	data, err := node.serialize()
 	if err != nil {
 		return err
@@ -54,7 +54,7 @@ func (bdb *BmtDB) GetBucket(key common.Hash) (*Bucket, error) {
 	return bucket, nil
 }
 
-func (bdb *BmtDB) PutBucket(batch *leveldb.Batch, key common.Hash, bucket *Bucket) error {
+func (bdb *BmtDB) PutBucket(batch tdb.Batch, key common.Hash, bucket *Bucket) error {
 	data, err := bucket.serialize()
 	if err != nil {
 		return nil
@@ -76,7 +76,7 @@ func (bdb *BmtDB) GetHashTable(key common.Hash) (*HashTable, error) {
 	return ht, nil
 }
 
-func (bdb *BmtDB) PutHashTable(batch *leveldb.Batch, key common.Hash, ht *HashTable) error {
+func (bdb *BmtDB) PutHashTable(batch tdb.Batch, key common.Hash, ht *HashTable) error {
 	data, err := ht.serialize()
 	if err != nil {
 		return err

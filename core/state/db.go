@@ -1,9 +1,9 @@
 package state
 
 import (
-	"tinychain/db/leveldb"
 	"github.com/hashicorp/golang-lru"
 	"tinychain/common"
+	tdb "tinychain/db"
 )
 
 const (
@@ -15,11 +15,11 @@ const (
 // "c" + contract_code_hash => code
 
 type cacheDB struct {
-	db        *leveldb.LDBDatabase
+	db        tdb.Database
 	codeCache *lru.Cache
 }
 
-func newCacheDB(db *leveldb.LDBDatabase) *cacheDB {
+func newCacheDB(db tdb.Database) *cacheDB {
 	l, _ := lru.New(cacheSize)
 	return &cacheDB{
 		db:        db,
@@ -49,4 +49,3 @@ func (db *cacheDB) PutCode(codeHash common.Hash, code []byte) error {
 	}
 	return nil
 }
-

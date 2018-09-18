@@ -8,6 +8,7 @@ import (
 	"sort"
 	"sync"
 	"tinychain/common"
+	"tinychain/consensus"
 	"tinychain/core"
 	"tinychain/core/state"
 	"tinychain/core/types"
@@ -24,17 +25,12 @@ var (
 	ErrTxDiscard   = errors.New("old transaction is better, discard the new one")
 )
 
-type TxValidator interface {
-	ValidateTxs(types.Transactions) error
-	ValidateTx(*types.Transaction) error
-}
-
 type TxPool struct {
-	config       *Config        // Txpool config
-	currentState *state.StateDB // Current state
-	validator    TxValidator    // Tx validator wrapper
-	all          *txLookup      // Cache all tx hash to accelerate searching
-	batch        *batcher.Batch // Batch for txs launching
+	config       *Config               // Txpool config
+	currentState *state.StateDB        // Current state
+	validator    consensus.TxValidator // Tx validator wrapper
+	all          *txLookup             // Cache all tx hash to accelerate searching
+	batch        *batcher.Batch        // Batch for txs launching
 	event        *event.TypeMux
 	quitCh       chan struct{}
 
@@ -49,7 +45,7 @@ type TxPool struct {
 	newTxSub event.Subscription // receive tx generated from local
 }
 
-func NewTxPool(config *common.Config, validator TxValidator, state *state.StateDB, useBatch bool, onlybroadcast bool) *TxPool {
+func NewTxPool(config *common.Config, validator consensus.TxValidator, state *state.StateDB, useBatch bool, onlybroadcast bool) *TxPool {
 	conf := newConfig(config)
 	tp := &TxPool{
 		config:       conf,

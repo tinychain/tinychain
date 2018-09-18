@@ -8,15 +8,11 @@ import (
 	"sync"
 	"sync/atomic"
 	"tinychain/common"
+	"tinychain/consensus"
 	"tinychain/core"
 	"tinychain/core/types"
 	"tinychain/event"
 	"tinychain/p2p/pb"
-	"tinychain/consensus"
-)
-
-const (
-	maxBlockGap = uint64(1000)
 )
 
 var (
@@ -127,7 +123,7 @@ func (bp *BlockPool) add(block *types.Block) error {
 	}
 	if bp.Size() >= bp.maxBlockSize {
 		// clear old blocks
-		bp.Clear(bp.ChainHeight() - maxBlockGap)
+		bp.Clear(bp.ChainHeight() - bp.maxBlockSize)
 		if bp.Size() >= bp.maxBlockSize {
 			return ErrPoolFull
 		}

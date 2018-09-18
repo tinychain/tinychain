@@ -2,7 +2,6 @@ package db
 
 import (
 	"sync"
-	"tinychain/db/leveldb"
 )
 
 var (
@@ -18,14 +17,14 @@ func newBatchMgr() *BatchMgr {
 	return &BatchMgr{}
 }
 
-func (bm *BatchMgr) getBatch(height uint64) *leveldb.Batch {
+func (bm *BatchMgr) getBatch(height uint64) Batch {
 	if batch, ok := bm.batches.Load(height); ok {
-		return batch.(*leveldb.Batch)
+		return batch.(Batch)
 	}
 	return nil
 }
 
-func (bm *BatchMgr) addBatch(height uint64, batch *leveldb.Batch) {
+func (bm *BatchMgr) addBatch(height uint64, batch Batch) {
 	bm.batches.Store(height, batch)
 }
 
@@ -33,7 +32,7 @@ func (bm *BatchMgr) delBatch(height uint64) {
 	bm.batches.Delete(height)
 }
 
-func GetBatch(db *leveldb.LDBDatabase, height uint64) *leveldb.Batch {
+func GetBatch(db Database, height uint64) Batch {
 	if batchMgr == nil {
 		batchMgr = newBatchMgr()
 	}
@@ -47,7 +46,7 @@ func GetBatch(db *leveldb.LDBDatabase, height uint64) *leveldb.Batch {
 	return batch
 }
 
-func CommitBatch(db *leveldb.LDBDatabase, height uint64) error {
+func CommitBatch(db Database, height uint64) error {
 	batch := GetBatch(db, height)
 	if err := batch.Write(); err != nil {
 		return err

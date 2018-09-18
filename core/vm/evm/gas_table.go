@@ -17,6 +17,7 @@
 package evm
 
 import (
+	"bytes"
 	"tinychain/common"
 	"tinychain/core/vm/evm/math"
 )
@@ -199,12 +200,11 @@ func gasSStore(gt GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Mem
 	// 1. From a zero-value address to a non-zero value         (NEW VALUE)
 	// 2. From a non-zero value address to a zero-value address (DELETE)
 	// 3. From a non-zero to a non-zero                         (CHANGE)
-	if val == (common.Hash{}) && y.Sign() != 0 {
+	if bytes.Compare(val, common.Hash{}.Bytes()) == 0 && y.Sign() != 0 {
 		// 0 => non 0
 		return SstoreSetGas, nil
-	} else if val != (common.Hash{}) && y.Sign() == 0 {
+	} else if bytes.Compare(val, common.Hash{}.Bytes()) != 0 && y.Sign() == 0 {
 		// non 0 => 0
-		evm.StateDB.AddRefund(SstoreRefundGas)
 		return SstoreClearGas, nil
 	} else {
 		// non 0 => non 0 (or 0 => 0)
@@ -481,9 +481,6 @@ func gasSuicide(gt GasTable, evm *EVM, contract *Contract, stack *Stack, mem *Me
 		gas += gt.CreateBySuicide
 	}
 
-	if !evm.StateDB.HasSuicided(contract.Address()) {
-		evm.StateDB.AddRefund(SuicideRefundGas)
-	}
 	return gas, nil
 }
 

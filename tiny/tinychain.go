@@ -1,18 +1,16 @@
 package tiny
 
 import (
+	"fmt"
 	"tinychain/common"
 	"tinychain/consensus"
+	"tinychain/consensus/pow"
+	"tinychain/consensus/solo"
+	"tinychain/consensus/vrf_bft"
 	"tinychain/core/chain"
 	"tinychain/core/executor"
 	"tinychain/core/state"
 	"tinychain/db"
-	"tinychain/db/leveldb"
-	"tinychain/event"
-	"tinychain/consensus/solo"
-	"tinychain/consensus/pow"
-	"tinychain/consensus/vrf_bft"
-	"fmt"
 )
 
 var (
@@ -23,13 +21,11 @@ var (
 type Tiny struct {
 	config *common.Config
 
-	eventHub *event.TypeMux
-
 	engine consensus.Engine
 
 	chain *chain.Blockchain
 
-	db *db.TinyDB
+	db db.Database
 
 	state *state.StateDB
 
@@ -39,15 +35,11 @@ type Tiny struct {
 }
 
 func New(config *common.Config) (*Tiny, error) {
-	eventHub := event.GetEventhub()
-
-	ldb, err := leveldb.NewLDBDataBase("tinychain")
+	ldb, err := db.NewLDBDataBase("tinychain")
 	if err != nil {
 		log.Errorf("Cannot create db, err:%s", err)
 		return nil, err
 	}
-	// Create tiny db
-	tinyDB := db.NewTinyDB(ldb)
 	// Create state db
 	statedb, err := state.New(ldb, nil)
 	if err != nil {
@@ -63,12 +55,11 @@ func New(config *common.Config) (*Tiny, error) {
 	}
 
 	tiny := &Tiny{
-		config:   config,
-		eventHub: eventHub,
-		db:       tinyDB,
-		network:  network,
-		chain:    bc,
-		state:    statedb,
+		config:  config,
+		db:      ldb,
+		network: network,
+		chain:   bc,
+		state:   statedb,
 	}
 	engineName := config.GetString(common.EngineName)
 	blockValidator := executor.NewBlockValidator(config, bc)
@@ -94,14 +85,18 @@ func (tiny *Tiny) Start() error {
 
 	// start network
 	tiny.network.Start()
+	tiny.executor.Start()
+	tiny.engine.Start()
 
+	return nil
 }
 
 func (tiny *Tiny) init() error {
-
+	return nil
 }
 
 func (tiny *Tiny) Close() {
-	tiny.eventHub.Stop()
+	tiny.engine.Stop()
+	tiny.executor.Stop()
 	tiny.network.Stop()
 }

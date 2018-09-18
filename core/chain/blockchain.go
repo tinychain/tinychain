@@ -9,7 +9,6 @@ import (
 	"tinychain/common"
 	"tinychain/core/types"
 	tdb "tinychain/db"
-	"tinychain/db/leveldb"
 )
 
 var (
@@ -35,7 +34,7 @@ type Blockchain struct {
 	headerCache *lru.Cache // headers lru cache
 }
 
-func NewBlockchain(db *leveldb.LDBDatabase) (*Blockchain, error) {
+func NewBlockchain(db tdb.Database) (*Blockchain, error) {
 	blockCache, _ := lru.New(blockCacheLimit)
 	headerCache, _ := lru.New(headerCacheLimit)
 	bc := &Blockchain{
@@ -225,7 +224,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 }
 
 // commit persist the block to db.
-func (bc *Blockchain) CommitBlock(batch *leveldb.Batch, block *types.Block) error {
+func (bc *Blockchain) CommitBlock(batch tdb.Batch, block *types.Block) error {
 	// Put block to db.Batch
 	if err := bc.db.PutBlock(batch, block, false, false); err != nil {
 		log.Errorf("failed to put block %s in db, err:%s", block.Hash(), err)

@@ -28,6 +28,7 @@ type StateDB interface {
 	ChargeGas(common.Address, uint64)
 
 	Suicide(common.Address) bool
+	HasSuicided(common.Address) bool
 
 	// Exist reports whether the given account exists in state.
 	// Notably this should also return true for suicided accounts.

@@ -199,6 +199,7 @@ func (solo *SoloEngine) validateAndCommit(block *types.Block, receipts types.Rec
 	if err := solo.validator.ValidateState(block, solo.state, receipts); err != nil {
 		log.Errorf("invalid block state, err:%s", err)
 		solo.event.Post(&core.RollbackEvent{})
+		solo.processLock <- struct{}{}
 		return err
 	}
 	solo.commit(block)

@@ -16,7 +16,7 @@ func newConfig(config *common.Config) *Config {
 	return &Config{
 		MaxTxSize:     uint64(config.GetInt64(common.MaxTxSize)),
 		PriceBump:     config.GetInt(common.PriceBump),
-		BatchTimeout:  config.GetDuration(common.BatchTimeout),
+		BatchTimeout:  config.GetDuration(common.BatchTimeout) * time.Millisecond,
 		BatchCapacity: config.GetInt(common.BatchCapacity),
 	}
 }

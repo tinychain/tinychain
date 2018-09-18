@@ -11,12 +11,14 @@ type Config struct {
 	routeFilePath string         // Store route table
 	privKey       crypto.PrivKey // Private key of peer
 	port          int            // Listener port
+	maxPeers      int            // max peers count
 }
 
 func newConfig(conf *common.Config) *Config {
 	config := &Config{
 		routeFilePath: conf.GetString(common.RouteFilePath),
 		port:          conf.GetInt(common.Port),
+		maxPeers:      conf.GetInt(common.MaxPeers),
 	}
 
 	privKeyStr := conf.GetString(common.NetPrivKey)

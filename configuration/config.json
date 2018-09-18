@@ -1,14 +1,24 @@
 {
   "consensus": {
+    "engine": "solo",
+    "miner": false,
+    "private_key": "xxxx",
+    "block_gas_limit": "",
+    "extra_data": ""
   },
   "p2p": {
     "port": 65535,
     "seeds": [],
     "routeFile": "",
-    "privKey": ""
+    "private_key": ""
   },
   "txpool": {
+    "max_tx_size": 248000,
+    "price_bump": 20,
+    "batch_capacity": 100,
+    "batch_timeout": ""
   },
   "blockpool": {
+    "max_block_size": 1000
   }
 }

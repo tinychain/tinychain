@@ -30,6 +30,7 @@ type RouteTable struct {
 	routeTable    *kbucket.RoutingTable // k-bucket route table
 	routeFilePath string                // Route table cache file
 	seeds         []ma.Multiaddr        // Seed peers for bootstrap
+	maxPeers      int
 
 	maxPeersCountForSync int
 	quitCh               chan struct{}
@@ -51,6 +52,7 @@ func NewRouteTable(config *Config, peer *Peer) *RouteTable {
 		seeds:                config.seeds,
 		maxPeersCountForSync: bucketSize,
 		routeFilePath:        config.routeFilePath,
+		maxPeers:             config.maxPeers,
 	}
 	//table.routeTable.Update(localId)
 
@@ -89,6 +91,11 @@ func (table *RouteTable) AddPeerInfo(prettyID string, addrStr []string) error {
 		return nil
 	}
 
+	if !table.HasPeer(pid) && len(table.peerStore.Peers()) >= table.maxPeers {
+		log.Warning("peer store is full")
+		return nil
+	}
+
 	addrs := make([]ma.Multiaddr, len(addrStr))
 	for i, v := range addrStr {
 		addrs[i], err = ma.NewMultiaddr(v)
@@ -108,9 +115,17 @@ func (table *RouteTable) AddPeer(pid peer.ID, addr ma.Multiaddr) {
 	if pid == table.peer.ID() {
 		return
 	}
+	if !table.HasPeer(pid) && len(table.peerStore.Peers()) >= table.maxPeers {
+		log.Warning("peer store is full")
+		return
+	}
 	log.Infof("Adding Peer:%s,%s\n", pid.Pretty(), addr.String())
 	table.peerStore.AddAddr(pid, addr, peerstore.PermanentAddrTTL)
 	table.update(pid)
+}
+
+func (table *RouteTable) HasPeer(pid peer.ID) bool {
+	return table.routeTable.Find(pid) != ""
 }
 
 // Add peer with []ma.Multiaddrs
@@ -118,10 +133,14 @@ func (table *RouteTable) AddPeerWithAddrs(pid peer.ID, addrs []ma.Multiaddr) {
 	if pid == table.peer.ID() {
 		return
 	}
-	if table.routeTable.Find(pid) != "" {
-		table.peerStore.SetAddrs(pid, addrs, peerstore.PermanentAddrTTL)
-	} else {
+	if !table.HasPeer(pid) {
+		if len(table.peerStore.Peers()) >= table.maxPeers {
+			log.Warning("peer store is full")
+			return
+		}
 		table.peerStore.AddAddrs(pid, addrs, peerstore.PermanentAddrTTL)
+	} else {
+		table.peerStore.SetAddrs(pid, addrs, peerstore.PermanentAddrTTL)
 	}
 	table.update(pid)
 }
@@ -149,6 +168,11 @@ func (table *RouteTable) AddPeers(peers []*pb.PeerInfo) error {
 		}
 	}
 	return nil
+}
+
+func (table *RouteTable) RemovePeer(pid peer.ID) {
+	table.routeTable.Remove(pid)
+	table.peerStore.ClearAddrs(pid)
 }
 
 func (table *RouteTable) GetNearestPeers(pid peer.ID) []peerstore.PeerInfo {

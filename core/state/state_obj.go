@@ -7,7 +7,7 @@ import (
 	"tinychain/common/cache"
 	"tinychain/core/bmt"
 	"tinychain/core/chain"
-	"tinychain/db/leveldb"
+	"tinychain/db"
 )
 
 var (
@@ -130,7 +130,7 @@ func (s *stateObject) SetNonce(nonce uint64) {
 	}
 }
 
-func (s *stateObject) Bmt(db *leveldb.LDBDatabase) BucketTree {
+func (s *stateObject) Bmt(db db.Database) BucketTree {
 	if tree := s.bmt; tree != nil {
 		return tree
 	}
@@ -183,7 +183,7 @@ func (s *stateObject) updateRoot() (common.Hash, error) {
 	return s.bmt.Process()
 }
 
-func (s *stateObject) Commit(batch *leveldb.Batch) error {
+func (s *stateObject) Commit(batch db.Batch) error {
 	err := s.bmt.Commit(batch)
 	if err != nil {
 		return err

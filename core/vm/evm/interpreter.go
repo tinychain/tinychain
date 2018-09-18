@@ -19,6 +19,7 @@ package evm
 import (
 	"fmt"
 	"sync/atomic"
+	"tinychain/core/vm"
 
 	"tinychain/core/vm/evm/math"
 )
@@ -209,7 +210,7 @@ func (in *EVMInterpreter) Run(contract *Contract, input []byte) (ret []byte, err
 		// cost is explicitly set so that the capture state defer method can get the proper cost
 		cost, err = operation.gasCost(in.gasTable, in.evm, contract, stack, mem, memorySize)
 		if err != nil || !contract.UseGas(cost) {
-			return nil, ErrOutOfGas
+			return nil, vm.ErrOutOfGas
 		}
 		if memorySize > 0 {
 			mem.Resize(memorySize)

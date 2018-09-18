@@ -1,13 +1,13 @@
-package leveldb
+package db
 
 import (
 	"bytes"
+	"fmt"
 	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
-	"fmt"
 )
 
 var log *logging.Logger // package-level logger
@@ -105,34 +105,34 @@ func (self *LDBDatabase) LDB() *leveldb.DB {
 
 // NewBatch returns a Batch instance
 // it allows batch-operation
-func (db *LDBDatabase) NewBatch() *Batch {
-	return &Batch{db: db.db, b: new(leveldb.Batch)}
+func (db *LDBDatabase) NewBatch() Batch {
+	return &ldbBatch{db: db.db, b: new(leveldb.Batch)}
 }
 
 // The Batch for LevelDB
 // ldbBatch implements the Batch interface
-type Batch struct {
+type ldbBatch struct {
 	db *leveldb.DB
 	b  *leveldb.Batch
 }
 
 // Put put the key-value to ldbBatch
-func (b *Batch) Put(key, value []byte) error {
+func (b *ldbBatch) Put(key, value []byte) error {
 	b.b.Put(key, value)
 	return nil
 }
 
 // Delete delete the key-value to ldbBatch
-func (b *Batch) Delete(key []byte) error {
+func (b *ldbBatch) Delete(key []byte) error {
 	b.b.Delete(key)
 	return nil
 }
 
 // Write write batch-operation to database
-func (b *Batch) Write() error {
+func (b *ldbBatch) Write() error {
 	return b.db.Write(b.b, nil)
 }
 
-func (b *Batch) Len() int {
+func (b *ldbBatch) Len() int {
 	return b.b.Len()
 }

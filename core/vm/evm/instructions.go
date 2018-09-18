@@ -20,6 +20,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"tinychain/core/vm"
 
 	"tinychain/common"
 	"tinychain/core/types"
@@ -546,7 +547,7 @@ func opBlockhash(pc *uint64, interpreter *EVMInterpreter, contract *Contract, me
 }
 
 func opCoinbase(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
-	stack.push(interpreter.evm.Coinbase.Big())
+	stack.push(interpreter.evm.Coinbase().Big())
 	return nil, nil
 }
 
@@ -603,14 +604,14 @@ func opMstore8(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memo
 func opSload(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	loc := stack.peek()
 	val := interpreter.evm.StateDB.GetState(contract.Address(), common.BigToHash(loc))
-	loc.SetBytes(val.Bytes())
+	loc.SetBytes(val)
 	return nil, nil
 }
 
 func opSstore(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memory *Memory, stack *Stack) ([]byte, error) {
 	loc := common.BigToHash(stack.pop())
 	val := stack.pop()
-	interpreter.evm.StateDB.SetState(contract.Address(), loc, common.BigToHash(val))
+	interpreter.evm.StateDB.SetState(contract.Address(), loc, common.BigToHash(val).Bytes())
 
 	interpreter.intPool.put(val)
 	return nil, nil
@@ -677,7 +678,7 @@ func opCreate(pc *uint64, interpreter *EVMInterpreter, contract *Contract, memor
 	// homestead we must check for CodeStoreOutOfGasError (homestead only
 	// rule) and treat as an error, if the ruleset is frontier we must
 	// ignore this error and pretend the operation was successful.
-	if suberr != nil && suberr != ErrCodeStoreOutOfGas {
+	if suberr != nil && suberr != vm.ErrCodeStoreOutOfGas {
 		stack.push(interpreter.intPool.getZero())
 	} else {
 		stack.push(addr.Big())

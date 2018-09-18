@@ -8,7 +8,7 @@ import (
 	"sort"
 	"sync"
 	"tinychain/common"
-	"tinychain/db/leveldb"
+	"tinychain/db"
 )
 
 type Bucket struct {
@@ -182,7 +182,7 @@ func (ht *HashTable) get(key string) ([]byte, error) {
 	return bucket.Slots[key], nil
 }
 
-func (ht *HashTable) commit(batch *leveldb.Batch) error {
+func (ht *HashTable) commit(batch db.Batch) error {
 	if ht.db == nil {
 		return ErrDbNotOpen
 	}

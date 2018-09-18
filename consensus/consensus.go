@@ -23,7 +23,7 @@ type BlockValidator interface {
 }
 
 type TxValidator interface {
-	ValidateTxs(types.Transactions) error
+	ValidateTxs(types.Transactions) (types.Transactions, types.Transactions)
 	ValidateTx(*types.Transaction) error
 }
 
