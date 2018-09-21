@@ -6,7 +6,7 @@ import (
 	"sync/atomic"
 	"tinychain/common"
 	"tinychain/core/bmt"
-	"tinychain/db/leveldb"
+	"tinychain/db"
 
 	json "github.com/json-iterator/go"
 	"github.com/libp2p/go-libp2p-crypto"
@@ -152,7 +152,7 @@ func (txs Transactions) Hash() common.Hash {
 	return root
 }
 
-func (txs Transactions) Commit(db *leveldb.LDBDatabase) error {
+func (txs Transactions) Commit(db *db.LDBDatabase) error {
 	txSet := bmt.WriteSet{}
 	for _, tx := range txs {
 		data, err := tx.Serialize()

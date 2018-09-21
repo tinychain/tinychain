@@ -176,6 +176,14 @@ func (bc *Blockchain) GetBlockByHash(hash common.Hash) *types.Block {
 	return bc.GetBlock(hash, height)
 }
 
+func (bc *Blockchain) GetHash(height uint64) common.Hash {
+	hash, err := bc.db.GetHash(height)
+	if err != nil {
+		return common.Hash{}
+	}
+	return hash
+}
+
 func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 	height, err := bc.db.GetHeight(hash)
 	if err != nil {

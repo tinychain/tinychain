@@ -35,7 +35,7 @@ func (h Hash) Bytes() []byte {
 	return h[:]
 }
 
-func (h Hash) Hex() []byte {
+func (h Hash) Hex() string {
 	return Hex(h[:])
 }
 
