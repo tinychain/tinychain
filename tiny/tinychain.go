@@ -20,18 +20,14 @@ var (
 // Tiny implements the tinychain full node service
 type Tiny struct {
 	config *common.Config
+	db     db.Database
 
-	engine consensus.Engine
-
-	chain *chain.Blockchain
-
-	db db.Database
-
-	state *state.StateDB
-
-	network *Network
-
-	executor executor.Executor
+	Engine   consensus.Engine
+	Executor executor.Executor
+	State    *state.StateDB
+	Network  *Network
+	Chain    *chain.Blockchain
+	TinyDB   *db.TinyDB
 }
 
 func New(config *common.Config) (*Tiny, error) {
@@ -57,20 +53,21 @@ func New(config *common.Config) (*Tiny, error) {
 	tiny := &Tiny{
 		config:  config,
 		db:      ldb,
-		network: network,
-		chain:   bc,
-		state:   statedb,
+		Network: network,
+		Chain:   bc,
+		State:   statedb,
+		TinyDB:  db.NewTinyDB(ldb),
 	}
 	engineName := config.GetString(common.EngineName)
 	blockValidator := executor.NewBlockValidator(config, bc)
 	txValidator := executor.NewTxValidator(config, statedb)
 	switch engineName {
 	case common.SoloEngine:
-		tiny.engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
+		tiny.Engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
 	case common.PowEngine:
-		tiny.engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
+		tiny.Engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
 	case common.VrfBftEngine:
-		tiny.engine, err = vrf_bft.New(config)
+		tiny.Engine, err = vrf_bft.New(config)
 	default:
 		return nil, fmt.Errorf("unknown consensus engine %s", engineName)
 	}
@@ -84,9 +81,9 @@ func (tiny *Tiny) Start() error {
 	// Collect protocols and register in the protocol manager
 
 	// start network
-	tiny.network.Start()
-	tiny.executor.Start()
-	tiny.engine.Start()
+	tiny.Network.Start()
+	tiny.Executor.Start()
+	tiny.Engine.Start()
 
 	return nil
 }
@@ -96,7 +93,7 @@ func (tiny *Tiny) init() error {
 }
 
 func (tiny *Tiny) Close() {
-	tiny.engine.Stop()
-	tiny.executor.Stop()
-	tiny.network.Stop()
+	tiny.Engine.Stop()
+	tiny.Executor.Stop()
+	tiny.Network.Stop()
 }

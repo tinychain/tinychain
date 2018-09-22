@@ -47,11 +47,3 @@ func GetBlockByHash(hash common.Hash) *types.Block {
 	}
 	return chain.GetBlockByHash(hash)
 }
-
-func GetHash(height uint64) common.Hash {
-	if chain == nil {
-		return common.Hash{}
-	}
-
-	return chain.GetHash(height)
-}

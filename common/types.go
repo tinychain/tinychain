@@ -36,7 +36,7 @@ func (h Hash) Bytes() []byte {
 }
 
 func (h Hash) Hex() string {
-	return Hex(h[:])
+	return string(Hex(h[:]))
 }
 
 func (h Hash) Big() *big.Int {

@@ -21,6 +21,12 @@
 			"revisionTime": "2017-01-16T20:05:12Z"
 		},
 		{
+			"checksumSHA1": "n0C9WpQz0YsSCbXg+EWxESy7V9U=",
+			"path": "github.com/alecthomas/jsonschema",
+			"revision": "f2c93856175a7dd6abe88c5c3900b67ad054adcc",
+			"revisionTime": "2018-03-08T10:59:23Z"
+		},
+		{
 			"checksumSHA1": "tmTwnJZMpwYat5xtkhAJCGxEf3w=",
 			"path": "github.com/btcsuite/btcd/btcec",
 			"revision": "86fed781132ac890ee03e906e4ecd5d6fa180c64",
@@ -242,6 +248,12 @@
 			"path": "github.com/huin/goupnp/ssdp",
 			"revision": "1395d1447324cbea88d249fbfcfd70ea878fdfca",
 			"revisionTime": "2018-04-15T21:51:57Z"
+		},
+		{
+			"checksumSHA1": "yaDVqPHa5F7RWleUgWtfdbAh70A=",
+			"path": "github.com/intel-go/fastjson",
+			"revision": "f846ae58a1ab4a99d9480ce565601aebd84e333a",
+			"revisionTime": "2017-03-29T17:06:29Z"
 		},
 		{
 			"checksumSHA1": "CmYdq+XNNDmPF0ah6I6MMXXama0=",
@@ -566,6 +578,12 @@
 			"path": "github.com/opentracing/opentracing-go/log",
 			"revision": "bd9c3193394760d98b2fa6ebb2291f0cd1d06a7d",
 			"revisionTime": "2018-06-06T20:41:48Z"
+		},
+		{
+			"checksumSHA1": "kY/41Y5T/MpDHfjLkibKrHK0yb4=",
+			"path": "github.com/osamingo/jsonrpc",
+			"revision": "26854088d64fddac06f1ebe5df5b0fae56223b75",
+			"revisionTime": "2018-09-16T13:28:20Z"
 		},
 		{
 			"checksumSHA1": "hlXUEyUn6u1ZhZbunDqTTEz1gyw=",

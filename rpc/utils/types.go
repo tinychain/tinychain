@@ -1,8 +1,8 @@
-package handlers
+package utils
 
 import "math/big"
 
-type header struct {
+type Header struct {
 	ParentHash    string   `json:"parent_hash"`
 	Height        uint64   `json:"height"`
 	StateRoot     string   `json:"state_root"`
@@ -16,7 +16,7 @@ type header struct {
 	ConsensusInfo []byte   `json:"consensus_info"`
 }
 
-type transaction struct {
+type Transaction struct {
 	Nonce     uint64   `json:"nonce"`
 	GasPrices uint64   `json:"gas_prices"`
 	GasLimit  uint64   `json:"gas_limit"`
@@ -24,11 +24,13 @@ type transaction struct {
 	From      string   `json:"from"`
 	To        string   `json:"to"`
 	Payload   []byte   `json:"payload"`
+	PubKey    string   `json:"pub_key"`
+	Signature string   `json:"signature"`
 }
 
-type block struct {
-	Header       header         `json:"header"`
-	Transactions []*transaction `json:"transactions,omitempty"`
+type Block struct {
+	Header       Header         `json:"header"`
+	Transactions []*Transaction `json:"transactions,omitempty"`
 	Pubkey       string         `json:"pubkey"`
 	Signature    string         `json:"signature"`
 }

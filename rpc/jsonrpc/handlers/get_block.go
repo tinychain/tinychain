@@ -5,35 +5,44 @@ import (
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
 	"tinychain/common"
-	"tinychain/core/chain"
+	"tinychain/rpc/utils"
+	"tinychain/tiny"
 )
 
 type getBlockParams struct {
 	Height uint64 `json:"height"`
-	Hash   []byte `json:"hash"`
+	Hash   string `json:"hash"`
 }
 
 type getBlockResult struct {
-	Block block `json:"block"`
+	Block utils.Block `json:"block"`
 }
 
-type GetBlockHandler struct{}
+type GetBlockHandler struct {
+	tiny *tiny.Tiny
+}
 
-func (h GetBlockHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessage) (result interface{}, err *jsonrpc.Error) {
+func (h GetBlockHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
 	var (
 		p   getBlockParams
-		txs []*transaction
+		txs []*utils.Transaction
 	)
 	if err := jsonrpc.Unmarshal(params, &p); err != nil {
 		return nil, err
 	}
 
-	hash := common.HexToHash(string(p.Hash))
+	hash := common.HexToHash(p.Hash)
 	height := p.Height
-	blk := chain.GetBlock(hash, height)
+	blk := h.tiny.Chain.GetBlock(hash, height)
+	if blk == nil {
+		return nil, &jsonrpc.Error{
+			Code:    404,
+			Message: "block not found",
+		}
+	}
 
 	for _, tx := range blk.Transactions {
-		txs = append(txs, &transaction{
+		txs = append(txs, &utils.Transaction{
 			Nonce:     tx.Nonce,
 			GasPrices: tx.GasPrice,
 			GasLimit:  tx.GasLimit,
@@ -45,8 +54,8 @@ func (h GetBlockHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMes
 	}
 
 	return getBlockResult{
-		Block: block{
-			Header: header{
+		Block: utils.Block{
+			Header: utils.Header{
 				ParentHash:    blk.ParentHash().Hex(),
 				Height:        blk.Height(),
 				StateRoot:     blk.StateRoot().Hex(),
