@@ -29,7 +29,7 @@ func (h GetHeaderHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMe
 	}
 
 	hash := common.HexToHash(p.Hash)
-	header := h.tiny.Chain.GetHeader(hash, p.Height)
+	header := h.tiny.Chain().GetHeader(hash, p.Height)
 	if header == nil {
 		return nil, utils.ErrNotFound("header not found")
 	}

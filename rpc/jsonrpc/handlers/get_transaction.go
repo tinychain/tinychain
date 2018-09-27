@@ -1,12 +1,12 @@
 package handlers
 
 import (
-	"tinychain/rpc/utils"
+	"context"
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
-	"context"
-	"tinychain/tiny"
 	"tinychain/common"
+	"tinychain/rpc/utils"
+	"tinychain/tiny"
 )
 
 type getTxParams struct {
@@ -29,12 +29,12 @@ func (s GetTxHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessag
 
 	notFoundErr := utils.ErrNotFound("transaction not found")
 	hash := common.HexToHash(p.Hash)
-	txMeta, err := s.tiny.TinyDB.GetTxMeta(hash)
+	txMeta, err := s.tiny.DB().GetTxMeta(hash)
 	if err != nil {
 		return nil, notFoundErr
 	}
 
-	block := s.tiny.Chain.GetBlock(txMeta.Hash, txMeta.Height)
+	block := s.tiny.Chain().GetBlock(txMeta.Hash, txMeta.Height)
 	if block != nil {
 		return nil, notFoundErr
 	}

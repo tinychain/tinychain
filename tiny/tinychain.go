@@ -22,12 +22,12 @@ type Tiny struct {
 	config *common.Config
 	db     db.Database
 
-	Engine   consensus.Engine
-	Executor executor.Executor
-	State    *state.StateDB
-	Network  *Network
-	Chain    *chain.Blockchain
-	TinyDB   *db.TinyDB
+	engine   consensus.Engine
+	executor *executor.Executor
+	state    *state.StateDB
+	network  *Network
+	chain    *chain.Blockchain
+	tinyDB   *db.TinyDB
 }
 
 func New(config *common.Config) (*Tiny, error) {
@@ -53,27 +53,30 @@ func New(config *common.Config) (*Tiny, error) {
 	tiny := &Tiny{
 		config:  config,
 		db:      ldb,
-		Network: network,
-		Chain:   bc,
-		State:   statedb,
-		TinyDB:  db.NewTinyDB(ldb),
+		network: network,
+		chain:   bc,
+		state:   statedb,
+		tinyDB:  db.NewTinyDB(ldb),
 	}
 	engineName := config.GetString(common.EngineName)
 	blockValidator := executor.NewBlockValidator(config, bc)
 	txValidator := executor.NewTxValidator(config, statedb)
 	switch engineName {
 	case common.SoloEngine:
-		tiny.Engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
+		tiny.engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
 	case common.PowEngine:
-		tiny.Engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
+		tiny.engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
 	case common.VrfBftEngine:
-		tiny.Engine, err = vrf_bft.New(config)
+		tiny.engine, err = vrf_bft.New(config)
 	default:
 		return nil, fmt.Errorf("unknown consensus engine %s", engineName)
 	}
 	if err != nil {
 		return nil, err
 	}
+
+	tiny.executor = executor.New(config, ldb, bc, tiny.engine)
+
 	return tiny, nil
 }
 
@@ -81,9 +84,9 @@ func (tiny *Tiny) Start() error {
 	// Collect protocols and register in the protocol manager
 
 	// start network
-	tiny.Network.Start()
-	tiny.Executor.Start()
-	tiny.Engine.Start()
+	tiny.network.Start()
+	tiny.executor.Start()
+	tiny.engine.Start()
 
 	return nil
 }
@@ -92,8 +95,28 @@ func (tiny *Tiny) init() error {
 	return nil
 }
 
+func (tiny *Tiny) DB() *db.TinyDB {
+	return tiny.tinyDB
+}
+
+func (tiny *Tiny) Chain() *chain.Blockchain {
+	return tiny.chain
+}
+
+func (tiny *Tiny) Network() *Network {
+	return tiny.network
+}
+
+func (tiny *Tiny) StateDB() *state.StateDB {
+	return tiny.state
+}
+
+func (tiny *Tiny) Executor() *executor.Executor {
+	return tiny.executor
+}
+
 func (tiny *Tiny) Close() {
-	tiny.Engine.Stop()
-	tiny.Executor.Stop()
-	tiny.Network.Stop()
+	tiny.engine.Stop()
+	tiny.executor.Stop()
+	tiny.network.Stop()
 }

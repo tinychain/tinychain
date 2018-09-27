@@ -48,10 +48,10 @@ type Executor struct {
 	rollbackSub     event.Subscription // Subscribe rollback event
 }
 
-func New(config *common.Config, db *db.TinyDB, chain *chain.Blockchain, engine consensus.Engine) *Executor {
+func New(config *common.Config, database db.Database, chain *chain.Blockchain, engine consensus.Engine) *Executor {
 	executor := &Executor{
 		conf:      config,
-		db:        db,
+		db:        db.NewTinyDB(database),
 		chain:     chain,
 		engine:    engine,
 		event:     event.GetEventhub(),

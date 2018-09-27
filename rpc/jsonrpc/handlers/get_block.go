@@ -33,7 +33,7 @@ func (h GetBlockHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMes
 
 	hash := common.HexToHash(p.Hash)
 	height := p.Height
-	blk := h.tiny.Chain.GetBlock(hash, height)
+	blk := h.tiny.Chain().GetBlock(hash, height)
 	if blk == nil {
 		return nil, &jsonrpc.Error{
 			Code:    404,

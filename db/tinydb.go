@@ -182,7 +182,7 @@ func (tdb *TinyDB) PutBlock(batch Batch, block *types.Block, sync, flush bool) e
 	return nil
 }
 
-func (tdb *TinyDB) GerReceipts(height uint64, hash common.Hash) (types.Receipts, error) {
+func (tdb *TinyDB) GetReceipts(height uint64, hash common.Hash) (types.Receipts, error) {
 	data, err := tdb.db.Get([]byte("r" + strconv.FormatUint(height, 10) + hash.String()))
 	if err != nil {
 		return nil, err

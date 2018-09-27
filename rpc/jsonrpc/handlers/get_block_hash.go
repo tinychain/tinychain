@@ -27,8 +27,7 @@ func (h GetBlockHashHandler) ServeJSONRPC(c context.Context, params *fastjson.Ra
 		return nil, err
 	}
 
-	// TODO
-	hash := h.tiny.Chain.GetHash(p.Height)
+	hash := h.tiny.Chain().GetHash(p.Height)
 	if hash.Nil() {
 		return nil, utils.ErrNotFound("block hash not found")
 	}
