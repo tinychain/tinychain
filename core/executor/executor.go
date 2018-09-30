@@ -13,10 +13,13 @@ import (
 	"tinychain/core/types"
 	"tinychain/db"
 	"tinychain/event"
+	"github.com/pkg/errors"
 )
 
 var (
 	log = common.GetLogger("executor")
+
+	errReceiptNumInvalid = errors.New("the number of transactions not equal to receipt")
 )
 
 // Processor represents the interface of block processor

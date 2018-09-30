@@ -2,8 +2,9 @@ package jsonrpc
 
 import (
 	"github.com/osamingo/jsonrpc"
-	"tinychain/rpc/jsonrpc/handlers"
 	"net/http"
+	"tinychain/rpc/api"
+	"tinychain/rpc/jsonrpc/handlers"
 	"tinychain/tiny"
 )
 
@@ -15,11 +16,15 @@ type Handler interface {
 }
 
 func InitHandler(t *tiny.Tiny) []Handler {
+	chainApi := &api.ChainAPI{t}
+	txApi := &api.TransactionAPI{t}
 	return []Handler{
-		handlers.GetBlockHandler{t},
-		handlers.GetBlockHashHandler{t},
-		handlers.GetHeaderHandler{t},
-		handlers.GetTxHandler{t},
+		handlers.GetBlockHandler{chainApi},
+		handlers.GetBlockHashHandler{chainApi},
+		handlers.GetHeaderHandler{chainApi},
+		handlers.GetTxHandler{txApi},
+		handlers.GetReceiptHandler{txApi},
+		handlers.SendTxHandler{txApi},
 	}
 }
 

@@ -18,7 +18,7 @@ import (
 	"h" + block height + block hash => header
 	"H" + block hash => block height
 	"b" + block height + block hash => block
-	"r" + block height + block hash => block receipts
+	"r" + txHash => block receipt
 	"l" + txHash => transaction meta data {hash,height,txIndex}
 */
 
@@ -182,25 +182,25 @@ func (tdb *TinyDB) PutBlock(batch Batch, block *types.Block, sync, flush bool) e
 	return nil
 }
 
-func (tdb *TinyDB) GetReceipts(height uint64, hash common.Hash) (types.Receipts, error) {
-	data, err := tdb.db.Get([]byte("r" + strconv.FormatUint(height, 10) + hash.String()))
+func (tdb *TinyDB) GetReceipt(txHash common.Hash) (*types.Receipt, error) {
+	data, err := tdb.db.Get([]byte("r" + txHash.String()))
 	if err != nil {
 		return nil, err
 	}
-	var receipts types.Receipts
-	err = receipts.Deserialize(data)
+	var receipt types.Receipt
+	err = receipt.Deserialize(data)
 	if err != nil {
 		return nil, err
 	}
-	return receipts, nil
+	return &receipt, nil
 }
 
-func (tdb *TinyDB) PutReceipts(batch Batch, height uint64, hash common.Hash, receipts types.Receipts, sync, flush bool) error {
-	data, err := receipts.Serialize()
+func (tdb *TinyDB) PutReceipt(batch Batch, txHash common.Hash, receipt *types.Receipt, sync, flush bool) error {
+	data, err := receipt.Serialize()
 	if err != nil {
 		return err
 	}
-	if err := batch.Put([]byte("r"+strconv.FormatUint(height, 10)+hash.String()), data); err != nil {
+	if err := batch.Put([]byte("r"+txHash.String()), data); err != nil {
 		return err
 	}
 

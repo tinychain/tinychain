@@ -14,7 +14,7 @@ func (ex *Executor) commit(block *types.Block) error {
 	}
 
 	if receipts, exist := ex.receiptsCache.Load(block.Height()); exist {
-		err := ex.persistReceipts(block, receipts.(types.Receipts))
+		err := ex.persistReceipts(block.Transactions, receipts.(types.Receipts), block.Height())
 		if err != nil {
 			log.Errorf("failed to persist receipts, err: %s", err)
 			return err
@@ -55,8 +55,17 @@ func (ex *Executor) persistTxs(block *types.Block) error {
 	return ex.db.PutTxMetas(db.GetBatch(ex.db.LDB(), block.Height()), block.Transactions, block.Hash(), block.Height(), false, false)
 }
 
-func (ex *Executor) persistReceipts(block *types.Block, receipts types.Receipts) error {
-	return ex.db.PutReceipts(db.GetBatch(ex.db.LDB(), block.Height()), block.Height(), block.Hash(), receipts, false, false)
+func (ex *Executor) persistReceipts(txs types.Transactions, receipts types.Receipts, height uint64) error {
+	if len(txs) != len(receipts) {
+		return errReceiptNumInvalid
+	}
+	for idx, rp := range receipts {
+		tx := txs[idx]
+		if err := ex.db.PutReceipt(db.GetBatch(ex.db.LDB(), height), tx.Hash(), rp, false, false); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (ex *Executor) commitBlock(block *types.Block) error {

@@ -4,8 +4,7 @@ import (
 	"context"
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
-	"tinychain/tiny"
-	"tinychain/rpc/utils"
+	"tinychain/rpc/api"
 )
 
 type getBlockHashParams struct {
@@ -17,7 +16,7 @@ type getBlockHashResult struct {
 }
 
 type GetBlockHashHandler struct {
-	tiny *tiny.Tiny
+	api *api.ChainAPI
 }
 
 func (h GetBlockHashHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
@@ -27,11 +26,7 @@ func (h GetBlockHashHandler) ServeJSONRPC(c context.Context, params *fastjson.Ra
 		return nil, err
 	}
 
-	hash := h.tiny.Chain().GetHash(p.Height)
-	if hash.Nil() {
-		return nil, utils.ErrNotFound("block hash not found")
-	}
-
+	hash := h.api.GetBlockHash(p.Height)
 	return getBlockHashResult{
 		Hash: string(hash.Hex()),
 	}, nil

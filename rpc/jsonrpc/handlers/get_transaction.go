@@ -5,8 +5,8 @@ import (
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
 	"tinychain/common"
+	"tinychain/rpc/api"
 	"tinychain/rpc/utils"
-	"tinychain/tiny"
 )
 
 type getTxParams struct {
@@ -15,10 +15,12 @@ type getTxParams struct {
 
 type getTxResult struct {
 	Transaction utils.Transaction `json:"transaction"`
+	BlockHash   string            `json:"block_hash"`
+	BlockHeight uint64            `json:"block_height"`
 }
 
 type GetTxHandler struct {
-	tiny *tiny.Tiny
+	api *api.TransactionAPI
 }
 
 func (s GetTxHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessage) (interface{}, *jsonrpc.Error) {
@@ -27,31 +29,15 @@ func (s GetTxHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessag
 		return nil, err
 	}
 
-	notFoundErr := utils.ErrNotFound("transaction not found")
 	hash := common.HexToHash(p.Hash)
-	txMeta, err := s.tiny.DB().GetTxMeta(hash)
-	if err != nil {
-		return nil, notFoundErr
+	tx, hash, height := s.api.GetTransaction(hash)
+	if tx == nil {
+		return nil, utils.ErrNotFound("transaction not found")
 	}
-
-	block := s.tiny.Chain().GetBlock(txMeta.Hash, txMeta.Height)
-	if block != nil {
-		return nil, notFoundErr
-	}
-	tx := block.Transactions[txMeta.TxIndex]
-
 	return getTxResult{
-		Transaction: utils.Transaction{
-			Nonce:     tx.Nonce,
-			GasPrices: tx.GasPrice,
-			GasLimit:  tx.GasLimit,
-			Value:     tx.Value,
-			From:      tx.From.Hex(),
-			To:        tx.To.Hex(),
-			Payload:   tx.Payload,
-			PubKey:    common.Bytes2Hex(tx.PubKey),
-			Signature: common.Bytes2Hex(tx.Signature),
-		},
+		Transaction: *tx,
+		BlockHash:   hash.Hex(),
+		BlockHeight: height,
 	}, nil
 
 }

@@ -6,7 +6,7 @@ import (
 	"context"
 	"tinychain/common"
 	"tinychain/rpc/utils"
-	"tinychain/tiny"
+	"tinychain/rpc/api"
 )
 
 type getHeaderParams struct {
@@ -19,7 +19,7 @@ type getHeaderResult struct {
 }
 
 type GetHeaderHandler struct {
-	tiny *tiny.Tiny
+	api *api.ChainAPI
 }
 
 func (h GetHeaderHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessage) (result interface{}, err *jsonrpc.Error) {
@@ -29,25 +29,13 @@ func (h GetHeaderHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMe
 	}
 
 	hash := common.HexToHash(p.Hash)
-	header := h.tiny.Chain().GetHeader(hash, p.Height)
+	header := h.api.GetHeaderByHash(hash)
 	if header == nil {
 		return nil, utils.ErrNotFound("header not found")
 	}
 
 	return getHeaderResult{
-		Header: utils.Header{
-			ParentHash:    header.ParentHash.Hex(),
-			Height:        header.Height,
-			StateRoot:     header.StateRoot.Hex(),
-			TxRoot:        header.TxRoot.Hex(),
-			ReceiptHash:   header.ReceiptsHash.Hex(),
-			Coinbase:      header.Coinbase.Hex(),
-			Time:          header.Time,
-			GasUsed:       header.GasUsed,
-			GasLimit:      header.GasLimit,
-			Extra:         header.Extra,
-			ConsensusInfo: header.ConsensusInfo,
-		},
+		Header: *header,
 	}, nil
 }
 
