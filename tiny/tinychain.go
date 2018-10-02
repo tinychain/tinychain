@@ -2,15 +2,15 @@ package tiny
 
 import (
 	"fmt"
-	"tinychain/common"
-	"tinychain/consensus"
-	"tinychain/consensus/pow"
-	"tinychain/consensus/solo"
-	"tinychain/consensus/vrf_bft"
-	"tinychain/core/chain"
-	"tinychain/core/executor"
-	"tinychain/core/state"
-	"tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/consensus"
+	"github.com/tinychain/tinychain/consensus/pow"
+	"github.com/tinychain/tinychain/consensus/solo"
+	"github.com/tinychain/tinychain/consensus/vrf_bft"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/executor"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/db"
 )
 
 var (

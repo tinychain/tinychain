@@ -1,7 +1,7 @@
 package dpos_bft
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"time"
 )
 

@@ -1,7 +1,7 @@
 package core
 
 import (
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 /*

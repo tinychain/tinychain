@@ -19,8 +19,8 @@ package abi
 import (
 	"fmt"
 	"strings"
-	"tinychain/common"
-	"tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
 // Event is an event potentially triggered by the EVM's LOG mechanism. The Event

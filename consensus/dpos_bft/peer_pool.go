@@ -1,13 +1,13 @@
 package dpos_bft
 
 import (
-	"tinychain/p2p/pb"
-	msg "tinychain/consensus/dpos_bft/message"
+	"github.com/tinychain/tinychain/p2p/pb"
+	msg "github.com/tinychain/tinychain/consensus/dpos_bft/message"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/golang/protobuf/proto"
-	"tinychain/event"
-	"tinychain/p2p"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/common"
 	"github.com/libp2p/go-libp2p-peer"
 	"github.com/op/go-logging"
 	"sync/atomic"

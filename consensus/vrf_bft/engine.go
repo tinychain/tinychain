@@ -1,6 +1,6 @@
 package vrf_bft
 
-import "tinychain/common"
+import "github.com/tinychain/tinychain/common"
 
 type VrfBft struct {
 }

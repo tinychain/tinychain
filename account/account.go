@@ -1,7 +1,7 @@
 package account
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"github.com/libp2p/go-libp2p-crypto"
 	"errors"
 )

@@ -3,7 +3,7 @@ package account
 import (
 	"github.com/libp2p/go-libp2p-crypto"
 	"crypto/rand"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type Key struct {

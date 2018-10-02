@@ -2,7 +2,7 @@ package vm
 
 import (
 	"math/big"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 const (

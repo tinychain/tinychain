@@ -19,9 +19,9 @@ package abi
 import (
 	"math/big"
 	"reflect"
-	"tinychain/common"
-	"tinychain/core/vm/evm"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 // packBytesSlice packs the given bytes as [L, V] as the canonical representation

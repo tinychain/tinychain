@@ -1,9 +1,9 @@
 package consensus
 
 import (
-	"tinychain/core/state"
-	"tinychain/core/types"
-	"tinychain/p2p"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/p2p"
 )
 
 type Engine interface {

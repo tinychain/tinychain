@@ -2,7 +2,7 @@ package pow
 
 import (
 	"math/big"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 type worker struct {

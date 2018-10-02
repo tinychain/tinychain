@@ -7,12 +7,12 @@ import (
 	"github.com/op/go-logging"
 	"sync"
 	"sync/atomic"
-	"tinychain/common"
-	"tinychain/consensus"
-	"tinychain/core"
-	"tinychain/core/types"
-	"tinychain/event"
-	"tinychain/p2p/pb"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/consensus"
+	"github.com/tinychain/tinychain/core"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/p2p/pb"
 )
 
 var (

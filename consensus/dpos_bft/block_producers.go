@@ -1,7 +1,7 @@
 package dpos_bft
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/libp2p/go-libp2p-peer"
 	"sort"

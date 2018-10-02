@@ -2,8 +2,9 @@ package db
 
 import (
 	"strconv"
-	"tinychain/common"
-	"tinychain/core/types"
+
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 /*

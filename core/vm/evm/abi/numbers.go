@@ -19,7 +19,7 @@ package abi
 import (
 	"math/big"
 	"reflect"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"tinychain/core/vm/evm/math"
 )
 
