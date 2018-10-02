@@ -2,9 +2,9 @@ package bmt
 
 import (
 	"testing"
-	"tinychain/db/leveldb"
+	"github.com/tinychain/tinychain/db/leveldb"
 	"github.com/stretchr/testify/assert"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 var (

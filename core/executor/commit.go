@@ -1,10 +1,10 @@
 package executor
 
 import (
-	"tinychain/common"
-	"tinychain/core"
-	"tinychain/core/types"
-	"tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/db"
 )
 
 func (ex *Executor) commit(block *types.Block) error {

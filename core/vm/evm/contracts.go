@@ -20,13 +20,13 @@ import (
 	"crypto/sha256"
 	"errors"
 	"math/big"
-	"tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm"
 
 	"golang.org/x/crypto/ripemd160"
-	"tinychain/common"
-	"tinychain/core/vm/evm/crypto"
-	"tinychain/core/vm/evm/crypto/bn256"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto/bn256"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 const (

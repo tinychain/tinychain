@@ -3,10 +3,10 @@ package executor
 import (
 	"errors"
 	"runtime"
-	"tinychain/common"
-	"tinychain/core/chain"
-	"tinychain/core/state"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 var (

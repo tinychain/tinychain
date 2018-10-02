@@ -10,8 +10,8 @@ import (
 	"bytes"
 	"math/big"
 
-	cloudflare "tinychain/core/vm/evm/crypto/bn256/cloudflare"
-	google "tinychain/core/vm/evm/crypto/bn256/google"
+	cloudflare "github.com/tinychain/tinychain/core/vm/evm/crypto/bn256/cloudflare"
+	google "github.com/tinychain/tinychain/core/vm/evm/crypto/bn256/google"
 )
 
 // FuzzAdd fuzzez bn256 addition between the Google and Cloudflare libraries.

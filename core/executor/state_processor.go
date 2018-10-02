@@ -1,12 +1,12 @@
 package executor
 
 import (
-	"tinychain/common"
-	"tinychain/core/chain"
-	"tinychain/core/state"
-	"tinychain/core/types"
-	"tinychain/core/vm"
-	"tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm/evm"
 )
 
 type vmType int

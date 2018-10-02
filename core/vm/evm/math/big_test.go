@@ -21,7 +21,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"testing"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 func TestHexOrDecimal256(t *testing.T) {

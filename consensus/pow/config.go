@@ -1,7 +1,7 @@
 package pow
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type Config struct {

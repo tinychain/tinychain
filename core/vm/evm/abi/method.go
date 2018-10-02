@@ -19,7 +19,7 @@ package abi
 import (
 	"fmt"
 	"strings"
-	"tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
 // Method represents a callable given a `Name` and whether the method is a constant.

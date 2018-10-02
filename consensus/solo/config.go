@@ -1,6 +1,6 @@
 package solo
 
-import "tinychain/common"
+import "github.com/tinychain/tinychain/common"
 
 type Config struct {
 	BP       bool   // this peer is block producer or not

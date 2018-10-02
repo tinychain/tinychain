@@ -19,7 +19,7 @@ package hexutil_test
 import (
 	"encoding/json"
 	"fmt"
-	"tinychain/core/vm/evm/hexutil"
+	"github.com/tinychain/tinychain/core/vm/evm/hexutil"
 )
 
 type MyType [5]byte

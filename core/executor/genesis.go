@@ -1,12 +1,12 @@
 package executor
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"math/big"
 	"time"
-	"tinychain/core/state"
-	tdb "tinychain/db"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/core/state"
+	tdb "github.com/tinychain/tinychain/db"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 func (ex *Executor) createGenesis() (*types.Block, error) {

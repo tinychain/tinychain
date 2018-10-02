@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"math/big"
 
-	"tinychain/common"
-	"tinychain/core/vm/evm/hexutil"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/hexutil"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 var _ = (*structLogMarshaling)(nil)

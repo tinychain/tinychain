@@ -1,7 +1,7 @@
 package txpool
 
 import (
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/core/types"
 	"sort"
 	"math/big"
 	"sync"

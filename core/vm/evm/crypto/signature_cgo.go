@@ -23,8 +23,8 @@ import (
 	"crypto/elliptic"
 	"fmt"
 
-	"tinychain/core/vm/evm/crypto/secp256k1"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto/secp256k1"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 // Ecrecover returns the uncompressed public key that created the given signature.

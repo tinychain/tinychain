@@ -28,9 +28,9 @@ import (
 	"math/big"
 	"os"
 
-	"tinychain/common"
-	"tinychain/core/vm/evm/crypto/sha3"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto/sha3"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 var (

@@ -4,9 +4,9 @@ import (
 	"context"
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
-	"tinychain/common"
-	"tinychain/rpc/api"
-	"tinychain/rpc/utils"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/rpc/api"
+	"github.com/tinychain/tinychain/rpc/utils"
 )
 
 type getTxParams struct {

@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"tinychain/p2p/pb"
+	"github.com/tinychain/tinychain/p2p/pb"
 	"errors"
 	"github.com/libp2p/go-libp2p-peer"
 )

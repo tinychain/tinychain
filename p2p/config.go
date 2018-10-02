@@ -3,7 +3,7 @@ package p2p
 import (
 	"github.com/libp2p/go-libp2p-crypto"
 	ma "github.com/multiformats/go-multiaddr"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type Config struct {

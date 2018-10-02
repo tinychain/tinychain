@@ -1,12 +1,12 @@
 package api
 
 import (
-	"tinychain/common"
-	"tinychain/core"
-	"tinychain/core/types"
-	"tinychain/event"
-	"tinychain/rpc/utils"
-	"tinychain/tiny"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/rpc/utils"
+	"github.com/tinychain/tinychain/tiny"
 )
 
 type TransactionAPI struct {

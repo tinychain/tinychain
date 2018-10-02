@@ -4,8 +4,8 @@ import (
 	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/pkg/errors"
 	"sync"
-	"tinychain/common"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 type Wallet interface {

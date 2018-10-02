@@ -1,8 +1,8 @@
 package bmt
 
 import (
-	"tinychain/common"
-	tdb "tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	tdb "github.com/tinychain/tinychain/db"
 )
 
 const (

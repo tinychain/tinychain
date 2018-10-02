@@ -2,9 +2,9 @@ package executor
 
 import (
 	"errors"
-	"tinychain/common"
-	"tinychain/core/state"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/types"
 
 	"github.com/libp2p/go-libp2p-crypto"
 )

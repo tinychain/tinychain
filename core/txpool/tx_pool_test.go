@@ -1,15 +1,15 @@
 package txpool
 
 import (
-	"tinychain/core/state"
-	"tinychain/db/leveldb"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/db"
 	"testing"
-	"tinychain/core/executor"
-	"tinychain/event"
-	"tinychain/core"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/core/executor"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/core"
+	"github.com/tinychain/tinychain/core/types"
 	"math/big"
-	"tinychain/account"
+	"github.com/tinychain/tinychain/account"
 	"github.com/magiconair/properties/assert"
 )
 
@@ -19,7 +19,7 @@ var (
 )
 
 func TestNewTxPool(t *testing.T) {
-	db, _ := leveldb.NewLDBDataBase("")
+	db, _ := db.NewLDBDataBase("")
 	config := &Config{
 		1000,
 		20,

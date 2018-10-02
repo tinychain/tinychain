@@ -26,8 +26,8 @@ import (
 	"reflect"
 	"testing"
 
-	"tinychain/common"
-	"tinychain/core/vm/evm/hexutil"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/hexutil"
 )
 
 var testAddrHex = "970e8128ab834e8eac17ab8e3812f010678cf791"

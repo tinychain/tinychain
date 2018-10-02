@@ -18,8 +18,8 @@ package evm
 
 import (
 	"bytes"
-	"tinychain/common"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 // GasTable organizes gas prices for different ethereum phases.

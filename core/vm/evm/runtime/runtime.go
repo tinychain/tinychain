@@ -20,12 +20,12 @@ import (
 	"math"
 	"math/big"
 	"time"
-	"tinychain/db/leveldb"
+	"github.com/tinychain/tinychain/db/leveldb"
 
-	"tinychain/common"
-	"tinychain/core/state"
-	"tinychain/core/vm/evm"
-	"tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
 // Config is a basic type specifying certain configuration flags for running

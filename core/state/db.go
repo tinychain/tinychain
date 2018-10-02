@@ -2,8 +2,8 @@ package state
 
 import (
 	"github.com/hashicorp/golang-lru"
-	"tinychain/common"
-	tdb "tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	tdb "github.com/tinychain/tinychain/db"
 )
 
 const (

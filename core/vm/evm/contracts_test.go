@@ -21,7 +21,7 @@ import (
 	"math/big"
 	"testing"
 
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 // precompiledTest defines the input/output pairs for precompiled contract tests.

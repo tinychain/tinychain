@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"math/big"
 	"reflect"
-	"tinychain/common"
-	"tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm"
 )
 
 var (

@@ -2,8 +2,8 @@ package vm
 
 import (
 	"math/big"
-	"tinychain/common"
-	"tinychain/core/types"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
 )
 
 // StateDB is an EVM database for full state querying.

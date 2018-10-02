@@ -1,9 +1,9 @@
 package api
 
 import (
-	"tinychain/common"
-	"tinychain/rpc/utils"
-	"tinychain/tiny"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/rpc/utils"
+	"github.com/tinychain/tinychain/tiny"
 )
 
 type ChainAPI struct {

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"math/big"
 	"sync/atomic"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type journalEntry interface {

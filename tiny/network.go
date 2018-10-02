@@ -2,9 +2,9 @@ package tiny
 
 import (
 	"github.com/libp2p/go-libp2p-peer"
-	"tinychain/common"
-	"tinychain/event"
-	"tinychain/p2p"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/p2p"
 )
 
 // Network is the wrapper of physical p2p network layer
