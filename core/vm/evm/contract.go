@@ -18,7 +18,7 @@ package evm
 
 import (
 	"math/big"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 // ContractRef is a reference to the contract's backing object

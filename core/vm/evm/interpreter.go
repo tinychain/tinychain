@@ -19,9 +19,9 @@ package evm
 import (
 	"fmt"
 	"sync/atomic"
-	"tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm"
 
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 // Config are the configuration options for the Interpreter

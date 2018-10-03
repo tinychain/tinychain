@@ -21,7 +21,7 @@ import (
 	"strings"
 	"testing"
 	"github.com/tinychain/tinychain/common"
-	"github.com/tinychain/tinychain/common/abi"
+	"github.com/tinychain/tinychain/core/vm/evm/abi"
 	"github.com/tinychain/tinychain/core/state"
 	"github.com/tinychain/tinychain/core/vm/evm"
 )
