@@ -19,7 +19,7 @@ package evm
 import (
 	"math/big"
 
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 // destinations stores one map per contract (keyed by hash of code).

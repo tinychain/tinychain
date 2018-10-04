@@ -3,8 +3,8 @@ package types
 import (
 	json "github.com/json-iterator/go"
 	"strconv"
-	"tinychain/common"
-	"tinychain/core/bmt"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/bmt"
 )
 
 // Receipt represents the results of a transaction

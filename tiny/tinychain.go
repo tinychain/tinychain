@@ -95,6 +95,14 @@ func (tiny *Tiny) init() error {
 	return nil
 }
 
+func (tiny *Tiny) Config() *common.Config {
+	return tiny.config
+}
+
+func (tiny *Tiny) RawDB() db.Database {
+	return tiny.db
+}
+
 func (tiny *Tiny) DB() *db.TinyDB {
 	return tiny.tinyDB
 }

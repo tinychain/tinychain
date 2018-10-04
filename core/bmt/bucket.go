@@ -7,8 +7,8 @@ import (
 	json "github.com/json-iterator/go"
 	"sort"
 	"sync"
-	"tinychain/common"
-	"tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/db"
 )
 
 type Bucket struct {

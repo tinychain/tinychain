@@ -22,8 +22,8 @@ import (
 	"io"
 	"math/big"
 	"time"
-	"tinychain/core/types"
-	"tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm"
 
 	"tinychain/common"
 	"tinychain/core/vm/evm/math"

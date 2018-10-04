@@ -42,7 +42,7 @@ import (
 	"fmt"
 	"hash"
 
-	ethcrypto "tinychain/core/vm/evm/crypto"
+	ethcrypto "github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
 var (

@@ -9,8 +9,8 @@ import (
 	"errors"
 	"github.com/golang/protobuf/proto"
 	"time"
-	"tinychain/common"
-	"tinychain/p2p/pb"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/p2p/pb"
 )
 
 var (

@@ -20,7 +20,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 // Memory implements a simple memory model for the ethereum virtual machine.

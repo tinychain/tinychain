@@ -17,8 +17,8 @@
 package runtime
 
 import (
-	"tinychain/common"
-	"tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm"
 )
 
 func NewEnv(cfg *Config) *evm.EVM {

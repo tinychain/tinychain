@@ -2,7 +2,7 @@ package txpool
 
 import (
 	"time"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type Config struct {

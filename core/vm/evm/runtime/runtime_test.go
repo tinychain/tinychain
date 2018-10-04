@@ -20,10 +20,10 @@ import (
 	"math/big"
 	"strings"
 	"testing"
-	"tinychain/common"
-	"tinychain/common/abi"
-	"tinychain/core/state"
-	"tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/abi"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/vm/evm"
 )
 
 func TestDefaults(t *testing.T) {

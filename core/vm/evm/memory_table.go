@@ -19,7 +19,7 @@ package evm
 import (
 	"math/big"
 
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 func memorySha3(stack *Stack) *big.Int {

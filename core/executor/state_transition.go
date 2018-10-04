@@ -3,9 +3,9 @@ package executor
 import (
 	"errors"
 	"math/big"
-	"tinychain/core/types"
-	"tinychain/core/vm"
-	"tinychain/core/vm/evm"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm/evm"
 )
 
 var (

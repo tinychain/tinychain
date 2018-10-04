@@ -1,6 +1,6 @@
 package executor
 
-import "tinychain/common"
+import "github.com/tinychain/tinychain/common"
 
 type Config struct {
 	MaxGasLimit uint64

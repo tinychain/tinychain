@@ -16,8 +16,8 @@ import (
 	"github.com/pkg/errors"
 	"sync"
 	"time"
-	"tinychain/common"
-	"tinychain/event"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/event"
 )
 
 const (

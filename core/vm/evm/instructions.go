@@ -20,12 +20,12 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm"
 
-	"tinychain/common"
-	"tinychain/core/types"
-	"tinychain/core/vm/evm/crypto"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 var (

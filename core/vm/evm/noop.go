@@ -19,9 +19,9 @@ package evm
 import (
 	"math/big"
 
-	"tinychain/common"
-	"tinychain/core/types"
-	"tinychain/core/vm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm"
 )
 
 func NoopCanTransfer(db vm.StateDB, from common.Address, balance *big.Int) bool {

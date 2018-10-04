@@ -1,9 +1,9 @@
 package api
 
 import (
-	"tinychain/common"
-	"tinychain/core/types"
-	"tinychain/rpc/utils"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/rpc/utils"
 )
 
 func convertBlock(blk *types.Block) *utils.Block {

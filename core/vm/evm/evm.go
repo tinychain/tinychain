@@ -20,10 +20,10 @@ import (
 	"math/big"
 	"sync/atomic"
 	"time"
-	"tinychain/core/vm"
 
-	"tinychain/common"
-	"tinychain/core/vm/evm/crypto"
+	"github.com/tinychain/tinychain/core/vm"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
 // emptyCodeHash is used by create to ensure deployment is disallowed to already

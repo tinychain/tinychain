@@ -11,8 +11,8 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"tinychain/common"
-	"tinychain/p2p/pb"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/p2p/pb"
 )
 
 var (

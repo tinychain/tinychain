@@ -3,9 +3,9 @@ package jsonrpc
 import (
 	"github.com/osamingo/jsonrpc"
 	"net/http"
-	"tinychain/rpc/api"
-	"tinychain/rpc/jsonrpc/handlers"
-	"tinychain/tiny"
+	"github.com/tinychain/tinychain/rpc/api"
+	"github.com/tinychain/tinychain/rpc/jsonrpc/handlers"
+	"github.com/tinychain/tinychain/tiny"
 )
 
 type Handler interface {

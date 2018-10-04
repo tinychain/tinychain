@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"testing"
 
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 type twoOperandTest struct {

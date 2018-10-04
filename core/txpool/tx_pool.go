@@ -7,14 +7,14 @@ import (
 	batcher "github.com/yyh1102/go-batcher"
 	"sort"
 	"sync"
-	"tinychain/common"
-	"tinychain/consensus"
-	"tinychain/core"
-	"tinychain/core/state"
-	"tinychain/core/types"
-	"tinychain/event"
-	"tinychain/p2p"
-	"tinychain/p2p/pb"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/consensus"
+	"github.com/tinychain/tinychain/core"
+	"github.com/tinychain/tinychain/core/state"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/event"
+	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/p2p/pb"
 )
 
 var (

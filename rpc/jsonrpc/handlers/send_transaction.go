@@ -5,9 +5,9 @@ import (
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
 	"math/big"
-	"tinychain/common"
-	"tinychain/core/types"
-	"tinychain/rpc/api"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/rpc/api"
 )
 
 type sendTxParams struct {

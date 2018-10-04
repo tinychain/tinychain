@@ -18,7 +18,7 @@ package evm
 
 import (
 	"math/big"
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 )
 
 // CallContext provides a basic interface for the EVM calling conventions. The EVM EVM

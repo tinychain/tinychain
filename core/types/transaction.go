@@ -4,9 +4,9 @@ import (
 	"errors"
 	"math/big"
 	"sync/atomic"
-	"tinychain/common"
-	"tinychain/core/bmt"
-	"tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/bmt"
+	"github.com/tinychain/tinychain/db"
 
 	json "github.com/json-iterator/go"
 	"github.com/libp2p/go-libp2p-crypto"

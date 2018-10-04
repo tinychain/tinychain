@@ -20,7 +20,7 @@ import (
 	"math/big"
 	"reflect"
 	"github.com/tinychain/tinychain/common"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 var (

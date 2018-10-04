@@ -6,9 +6,9 @@ import (
 	"github.com/hashicorp/golang-lru"
 	"sync"
 	"sync/atomic"
-	"tinychain/common"
-	"tinychain/core/types"
-	tdb "tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	tdb "github.com/tinychain/tinychain/db"
 )
 
 var (

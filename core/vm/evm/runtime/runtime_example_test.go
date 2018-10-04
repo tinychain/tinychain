@@ -18,8 +18,8 @@ package runtime_test
 
 import (
 	"fmt"
-	"tinychain/common"
-	"tinychain/core/vm/evm/runtime"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/runtime"
 )
 
 func ExampleExecute() {

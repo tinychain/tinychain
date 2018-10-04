@@ -4,9 +4,9 @@ import (
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
 	"context"
-	"tinychain/common"
-	"tinychain/rpc/utils"
-	"tinychain/rpc/api"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/rpc/utils"
+	"github.com/tinychain/tinychain/rpc/api"
 )
 
 type getHeaderParams struct {

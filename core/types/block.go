@@ -1,7 +1,7 @@
 package types
 
 import (
-	"tinychain/common"
+	"github.com/tinychain/tinychain/common"
 	"math/big"
 	"sync/atomic"
 	json "github.com/json-iterator/go"

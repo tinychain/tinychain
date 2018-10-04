@@ -6,10 +6,10 @@ import (
 	"sync/atomic"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/common/cache"
-	"tinychain/core/bmt"
-	"tinychain/core/chain"
-	"tinychain/core/types"
-	tdb "tinychain/db"
+	"github.com/tinychain/tinychain/core/bmt"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/types"
+	tdb "github.com/tinychain/tinychain/db"
 )
 
 const (
@@ -466,12 +466,13 @@ func (sdb *StateDB) RevertToSnapshot(revid int) {
 	// Replay the journal to undo changes and remove invalid snapshots
 	sdb.journal.revert(sdb, snapshot)
 	sdb.revision = sdb.revision[:revid]
-	sdb.nextRevisionId = revid + 1
+	sdb.nextRevisionId = revid
 }
 
 func (sdb *StateDB) clearJournal() {
 	sdb.journal = newJournal()
 	sdb.revision = sdb.revision[:0]
+	sdb.nextRevisionId = 0
 }
 
 // Prepare will be called when execute a new tx in state processor
