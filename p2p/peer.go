@@ -14,10 +14,10 @@ import (
 	bhost "github.com/libp2p/go-libp2p/p2p/host/basic"
 	ma "github.com/multiformats/go-multiaddr"
 	"github.com/pkg/errors"
-	"sync"
-	"time"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/event"
+	"sync"
+	"time"
 )
 
 const (
@@ -241,7 +241,7 @@ func (peer *Peer) Broadcast(pbName string, data []byte) {
 	}
 }
 
-// Multicast retrieves nearest peers from route table and send msg to them.
+// Multicast send msg to given peers.
 func (peer *Peer) Multicast(pids []peer.ID, pbName string, data []byte) {
 	for _, pid := range pids {
 		if pid == peer.ID() {
@@ -256,4 +256,10 @@ func (peer *Peer) Multicast(pids []peer.ID, pbName string, data []byte) {
 			peer.routeTable.update(pid)
 		}()
 	}
+}
+
+// MulticastNeighbor retrieves `n` nearest neighbor from route_table and sends message to them.
+func (peer *Peer) MulticastNeighbor(pbName string, data []byte, count int) {
+	pids := peer.routeTable.nearestPeers(peer.ID(), count)
+	peer.Multicast(pids, pbName, data)
 }

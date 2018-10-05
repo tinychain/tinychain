@@ -2,7 +2,6 @@ package executor
 
 import (
 	"fmt"
-	batcher "github.com/yyh1102/go-batcher"
 	"sync"
 	"sync/atomic"
 	"github.com/tinychain/tinychain/common"
@@ -31,7 +30,6 @@ type Executor struct {
 	conf      *common.Config
 	db        *db.TinyDB
 	chain     *chain.Blockchain // Blockchain wrapper
-	batch     batcher.Batch     // Batch for creating new block
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux

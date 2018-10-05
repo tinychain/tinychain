@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewLDBDataBase(t *testing.T) {
-	db, err := NewLDBDataBase(nil, "../../build")
+	db, err := NewLDBDataBase("test")
 	if err != nil {
 		log.Error(err)
 	}
