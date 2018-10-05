@@ -36,7 +36,7 @@ The VM module is designed as pluggable modules.
 At step 1, we will support EVM. And in the future version, we'll implement the below virtual machine step by step:
 
 - [eWasm](https://github.com/ewasm/design)
-- Java VM
+- Javascript VM
 
 #### Contract language
 At this EVM version, developers are coding with [solidity](https://solidity.readthedocs.io/), which is widely used to develop Dapps.

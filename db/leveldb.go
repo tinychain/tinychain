@@ -3,21 +3,11 @@ package db
 import (
 	"bytes"
 	"fmt"
-	"github.com/op/go-logging"
 	"github.com/pkg/errors"
 	"github.com/syndtr/goleveldb/leveldb"
 	"github.com/syndtr/goleveldb/leveldb/iterator"
 	"github.com/syndtr/goleveldb/leveldb/util"
 )
-
-var log *logging.Logger // package-level logger
-const (
-	LEVEL_DB_PATH = "dbConfig.leveldbPath"
-)
-
-func init() {
-	log = logging.MustGetLogger("hyperdb/leveldb_lru")
-}
 
 // the Database for LevelDB
 // LDBDatabase implements the DataBase interface
@@ -30,10 +20,7 @@ type LDBDatabase struct {
 // require a data filepath
 // return *LDBDataBase and  will
 // return an error with type of
-// ErrCorrupted if corruption detected in the DB. Corrupted
-// DB can be recovered with Recover function.
-// the return *LDBDatabase is goruntine-safe
-// the LDBDataBase instance must be close after use, by calling Close method
+// ErrCorrupted if corruption detected in the DB.
 func NewLDBDataBase(filepath string) (*LDBDatabase, error) {
 	db, err := leveldb.OpenFile(filepath, nil)
 	return &LDBDatabase{

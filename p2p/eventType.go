@@ -23,6 +23,13 @@ type MulticastEvent struct {
 	Data    []byte
 }
 
+// Multicast msg to `count` nearest neighbor
+type MulticastNeighborEvent struct {
+	Typ   string
+	Data  []byte
+	Count int
+}
+
 // Random Multicast message with p2p network layer
 type RandomSendEvnet struct {
 	Typ  string

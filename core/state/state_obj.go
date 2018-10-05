@@ -3,11 +3,11 @@ package state
 import (
 	json "github.com/json-iterator/go"
 	"math/big"
-	"tinychain/common"
-	"tinychain/common/cache"
-	"tinychain/core/bmt"
-	"tinychain/core/chain"
-	"tinychain/db"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/common/cache"
+	"github.com/tinychain/tinychain/core/bmt"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/db"
 )
 
 var (

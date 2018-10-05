@@ -2,7 +2,7 @@ package bmt
 
 import (
 	"testing"
-	"github.com/tinychain/tinychain/db/leveldb"
+	"github.com/tinychain/tinychain/db"
 	"github.com/stretchr/testify/assert"
 	"github.com/tinychain/tinychain/common"
 )
@@ -10,14 +10,14 @@ import (
 var (
 	btree = CreateBucketTree()
 	root  common.Hash
-	db    *leveldb.LDBDatabase
+	ldb    *db.LDBDatabase
 )
 
 func CreateBucketTree() *BucketTree {
-	if db == nil {
-		db, _ = leveldb.NewLDBDataBase("bucket_tree_test")
+	if ldb == nil {
+		ldb, _ = db.NewLDBDataBase("bucket_tree_test")
 	}
-	return NewBucketTree(db)
+	return NewBucketTree(ldb)
 }
 
 func TestBucketTree_WithoutDB(t *testing.T) {
@@ -36,7 +36,7 @@ func TestBucketTree_WithoutDB(t *testing.T) {
 }
 
 func TestBucketTree_Process(t *testing.T) {
-	var batch = db.NewBatch()
+	var batch = ldb.NewBatch()
 	writeSet := NewWriteSet()
 	writeSet["test1"] = []byte("asdffsdf")
 	writeSet["abcd"] = []byte("test2asd")
@@ -65,7 +65,7 @@ func TestBucketTree_Read(t *testing.T) {
 }
 
 func TestBucketTree_Update(t *testing.T) {
-	var batch = db.NewBatch()
+	var batch = ldb.NewBatch()
 	oldRoot := btree.Hash()
 	newSet := NewWriteSet()
 	newSet["lowesyang"] = []byte("lowesyang")

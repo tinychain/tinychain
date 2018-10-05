@@ -63,6 +63,10 @@ func (p *Network) Stop() {
 	p.peer.Stop()
 }
 
+func (p *Network) Peer() *p2p.Peer {
+	return p.peer
+}
+
 func (p *Network) AddProtocol(proto p2p.Protocol) error {
 	return p.peer.AddProtocol(proto)
 }
