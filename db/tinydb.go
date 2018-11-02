@@ -5,6 +5,7 @@ import (
 
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/core/types"
+	"github.com/op/go-logging"
 )
 
 /*
@@ -23,10 +24,16 @@ import (
 	"l" + txHash => transaction meta data {hash,height,txIndex}
 */
 
+var log *logging.Logger // package-level logger
+
 const (
 	KeyLastHeader = "LastHeader"
 	KeyLastBlock  = "LastBlock"
 )
+
+func init() {
+	log = logging.MustGetLogger("tinydb")
+}
 
 // TinyDB stores and manages blockchain data
 type TinyDB struct {

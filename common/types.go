@@ -1,7 +1,3 @@
-/*
-HyperDCDN License
-Copyright (C) 2017 The HyperDCDN Authors.
-*/
 package common
 
 import (
