@@ -19,14 +19,13 @@ package evm
 import (
 	"encoding/hex"
 	"fmt"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/core/vm"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 	"io"
 	"math/big"
 	"time"
-	"github.com/tinychain/tinychain/core/types"
-	"github.com/tinychain/tinychain/core/vm"
-
-	"tinychain/common"
-	"tinychain/core/vm/evm/math"
 )
 
 // Storage represents a contract's storage.

@@ -21,8 +21,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/tinychain/tinychain/core/vm"
 	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm"
 	"github.com/tinychain/tinychain/core/vm/evm/crypto"
 )
 
