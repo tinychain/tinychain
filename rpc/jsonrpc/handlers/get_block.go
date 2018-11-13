@@ -5,8 +5,8 @@ import (
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
 	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/internal/api"
 	"github.com/tinychain/tinychain/rpc/utils"
-	"github.com/tinychain/tinychain/rpc/api"
 )
 
 type getBlockParams struct {

@@ -1,9 +1,10 @@
 package jsonrpc
 
 import (
-	"github.com/osamingo/jsonrpc"
 	"net/http"
-	"github.com/tinychain/tinychain/rpc/api"
+
+	"github.com/osamingo/jsonrpc"
+	"github.com/tinychain/tinychain/internal/api"
 	"github.com/tinychain/tinychain/rpc/jsonrpc/handlers"
 	"github.com/tinychain/tinychain/tiny"
 )
