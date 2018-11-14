@@ -19,8 +19,8 @@ package evm
 import (
 	"math/big"
 
-	"tinychain/common"
-	"tinychain/core/vm/evm/math"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/core/vm/evm/math"
 )
 
 const (
