@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/osamingo/jsonrpc"
-	"github.com/tinychain/tinychain/internal/api"
+	"github.com/tinychain/tinychain/rpc/api"
 	"github.com/tinychain/tinychain/rpc/jsonrpc/handlers"
 	"github.com/tinychain/tinychain/tiny"
 )
@@ -29,7 +29,7 @@ func InitHandler(t *tiny.Tiny) []Handler {
 	}
 }
 
-func StartJsonRPCServer(t *tiny.Tiny) error {
+func Start(t *tiny.Tiny) error {
 	mr := jsonrpc.NewMethodRepository()
 
 	for _, s := range InitHandler(t) {

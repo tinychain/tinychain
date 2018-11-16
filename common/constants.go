@@ -35,6 +35,9 @@ const (
 	Seeds         = "p2p.seeds"
 	MaxPeers      = "p2p.max_peers"
 
+	// VM
+	VMType = "vm.type"
+
 	// Transaction Pool
 	MaxTxSize     = "txpool.max_tx_size"
 	PriceBump     = "txpool.price_bump"     // percent

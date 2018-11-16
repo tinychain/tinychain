@@ -8,10 +8,11 @@ import (
 	"github.com/osamingo/jsonrpc"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/core/types"
-	"github.com/tinychain/tinychain/internal/api"
+	"github.com/tinychain/tinychain/rpc/api"
 )
 
 type sendTxParams struct {
+	Call      bool     `json:"call"` // is call req or not
 	Nonce     uint64   `json:"nonce"`
 	GasPrice  uint64   `json:"gas_price"`
 	GasLimit  uint64   `json:"gas_limit"`
@@ -50,9 +51,13 @@ func (s SendTxHandler) ServeJSONRPC(c context.Context, params *fastjson.RawMessa
 	tx.PubKey = common.Hex2Bytes(p.PubKey)
 	tx.Signature = common.Hex2Bytes(p.Signature)
 
-	s.api.SendTransaction(tx)
+	if p.Call {
+		s.api.Call(tx)
+	} else {
+		s.api.SendTransaction(tx)
+	}
 	return sendTxResult{
-
+		TxHash: tx.Hash().Hex(),
 	}, nil
 }
 

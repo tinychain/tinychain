@@ -7,9 +7,20 @@ import (
 	"github.com/tinychain/tinychain/p2p"
 )
 
+type Peer interface {
+	Start()
+	Stop()
+	ID() peer.ID
+	Send(peer.ID, string, []byte) error
+	Multicast([]peer.ID, string, []byte)
+	Broadcast(string, []byte)
+	AddProtocol(common.Protocol) error
+	DelProtocol(common.Protocol)
+}
+
 // Network is the wrapper of physical p2p network layer
 type Network struct {
-	peer  *p2p.Peer
+	peer  Peer
 	event *event.TypeMux
 
 	// Send message event subscription
@@ -19,12 +30,7 @@ type Network struct {
 	quitCh chan struct{}
 }
 
-func NewNetwork(config *common.Config) *Network {
-	peer, err := p2p.New(config)
-	if err != nil {
-		log.Error("Failed to create p2p Network")
-		return nil
-	}
+func NewNetwork(peer Peer) *Network {
 	return &Network{
 		peer:   peer,
 		event:  event.GetEventhub(),
@@ -63,14 +69,14 @@ func (p *Network) Stop() {
 	p.peer.Stop()
 }
 
-func (p *Network) Peer() *p2p.Peer {
+func (p *Network) Peer() Peer {
 	return p.peer
 }
 
-func (p *Network) AddProtocol(proto p2p.Protocol) error {
+func (p *Network) AddProtocol(proto common.Protocol) error {
 	return p.peer.AddProtocol(proto)
 }
 
-func (p *Network) DelProtocol(proto p2p.Protocol) {
+func (p *Network) DelProtocol(proto common.Protocol) {
 	p.peer.DelProtocol(proto)
 }

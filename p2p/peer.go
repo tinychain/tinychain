@@ -30,8 +30,8 @@ const (
 var (
 	TransProtocol = protocol.ID("/chain/1.0.0.")
 	log           = common.GetLogger("p2p")
-
-	ErrSendToSelf = errors.New("Send message to self")
+	errDupHandler = errors.New("p2p handler duplicate")
+	errSendToSelf = errors.New("Send message to self")
 )
 
 // NewHost construct a host of libp2p
@@ -168,7 +168,7 @@ func (peer *Peer) Connect(pid peer.ID) error {
 // Send message to a peer
 func (peer *Peer) Send(pid peer.ID, typ string, data []byte) error {
 	if pid == peer.ID() {
-		return ErrSendToSelf
+		return errSendToSelf
 	}
 
 	stream := NewStreamWithPid(pid, peer)
@@ -208,7 +208,7 @@ func (peer *Peer) listenMsg() {
 			//log.Infof("Receive message: Name:%s, data:%s \n", message.Name, message.Data)
 			// Handler run
 			if protocols, exist := peer.protocols.Load(inner.msg.Name); exist {
-				for _, proto := range protocols.([]Protocol) {
+				for _, proto := range protocols.([]common.Protocol) {
 					go proto.Run(inner.pid, inner.msg)
 				}
 			}
@@ -262,4 +262,33 @@ func (peer *Peer) Multicast(pids []peer.ID, pbName string, data []byte) {
 func (peer *Peer) MulticastNeighbor(pbName string, data []byte, count int) {
 	pids := peer.routeTable.nearestPeers(peer.ID(), count)
 	peer.Multicast(pids, pbName, data)
+}
+
+func (p *Peer) AddProtocol(proto common.Protocol) error {
+	if protocols, exist := p.protocols.Load(proto.Type()); exist {
+		protocols := protocols.([]common.Protocol)
+		for _, protocol := range protocols {
+			if protocol == proto {
+				return errDupHandler
+			}
+		}
+		protocols = append(protocols, proto)
+		p.protocols.Store(proto.Type(), protocols)
+	} else {
+		p.protocols.Store(proto.Type(), []common.Protocol{proto})
+	}
+	return nil
+}
+
+func (p *Peer) DelProtocol(proto common.Protocol) {
+	if protocols, exist := p.protocols.Load(proto.Type()); exist {
+		protocols := protocols.([]common.Protocol)
+		for i, protocol := range protocols {
+			if protocol == proto {
+				protocols = append(protocols[:i], protocols[i+1:]...)
+				break
+			}
+		}
+		p.protocols.Store(proto.Type(), protocols)
+	}
 }

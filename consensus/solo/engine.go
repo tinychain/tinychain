@@ -229,6 +229,6 @@ func (solo *SoloEngine) commitComplete(block *types.Block) {
 	}
 }
 
-func (solo *SoloEngine) Protocols() []p2p.Protocol {
+func (solo *SoloEngine) Protocols() []common.Protocol {
 	return nil
 }

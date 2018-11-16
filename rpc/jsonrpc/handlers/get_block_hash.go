@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/intel-go/fastjson"
 	"github.com/osamingo/jsonrpc"
-	"github.com/tinychain/tinychain/internal/api"
+	"github.com/tinychain/tinychain/rpc/api"
 )
 
 type getBlockHashParams struct {

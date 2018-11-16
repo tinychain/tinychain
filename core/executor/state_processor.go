@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"github.com/tinychain/tiny-wasm"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/core/chain"
 	"github.com/tinychain/tinychain/core/state"
@@ -12,7 +13,7 @@ import (
 type vmType int
 
 const (
-	EVM   vmType = iota
+	EVM vmType = iota
 	EWASM
 	JSVM
 )
@@ -68,7 +69,7 @@ func (ex *Executor) applyTransaction(cfg *common.Config, bc *chain.Blockchain, a
 }
 
 func NewVM(config *common.Config, tx *types.Transaction, header *types.Header, bc *chain.Blockchain, author *common.Address, statedb *state.StateDB) vm.VM {
-	vmType := config.GetString("vm.type")
+	vmType := config.GetString(common.VMType)
 	switch vmType {
 	case vm.EVM:
 		// create a vm config
@@ -76,6 +77,10 @@ func NewVM(config *common.Config, tx *types.Transaction, header *types.Header, b
 		// Create a new context to be used in the EVM environment
 		context := evm.NewEVMContext(tx, header, bc, author)
 		return evm.NewEVM(context, statedb, cfg)
+	case vm.EWASM:
+		cfg := tinywasm.Config{}
+		context := tinywasm.NewEVMContext(tx, header, bc, author)
+		return tinywasm.NewEVM(context, statedb, cfg)
 	default:
 		return nil
 	}

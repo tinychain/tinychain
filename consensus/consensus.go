@@ -10,7 +10,7 @@ type Engine interface {
 	Start() error
 	Stop() error
 	// protocol handled at p2p layer
-	Protocols() []p2p.Protocol
+	Protocols() []common.Protocol
 	// Finalize a valid block
 	Finalize(header *types.Header, state *state.StateDB, txs types.Transactions, receipts types.Receipts) (*types.Block, error)
 }

@@ -45,6 +45,12 @@ func (api *ChainAPI) GetHeaderByHash(hash common.Hash) *utils.Header {
 	return api.GetHeader(hash, height)
 }
 
+func (api *ChainAPI) GetHeaderByHeight(height uint64) *utils.Header {
+	hash := api.tiny.Chain().GetHash(height)
+	header := api.tiny.Chain().GetHeader(hash, height)
+	return convertHeader(header)
+}
+
 // Height returns the latest block height
 func (api *ChainAPI) Height() uint64 {
 	return api.tiny.Chain().LastHeight()
@@ -54,4 +60,3 @@ func (api *ChainAPI) Height() uint64 {
 func (api *ChainAPI) Hash() common.Hash {
 	return api.tiny.Chain().LastBlock().Hash()
 }
-

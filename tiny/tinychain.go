@@ -11,6 +11,8 @@ import (
 	"github.com/tinychain/tinychain/core/executor"
 	"github.com/tinychain/tinychain/core/state"
 	"github.com/tinychain/tinychain/db"
+	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/rpc/jsonrpc"
 )
 
 var (
@@ -43,7 +45,12 @@ func New(config *common.Config) (*Tiny, error) {
 		return nil, err
 	}
 
-	network := NewNetwork(config)
+	peer, err := p2p.New(config)
+	if err != nil {
+		log.Error("Failed to create p2p Network")
+		return nil, err
+	}
+	network := NewNetwork(peer)
 	bc, err := chain.NewBlockchain(ldb)
 	if err != nil {
 		log.Error("Failed to create blockchain")
@@ -88,10 +95,9 @@ func (tiny *Tiny) Start() error {
 	tiny.executor.Start()
 	tiny.engine.Start()
 
-	return nil
-}
+	// start json rpc server
+	jsonrpc.Start(tiny)
 
-func (tiny *Tiny) init() error {
 	return nil
 }
 

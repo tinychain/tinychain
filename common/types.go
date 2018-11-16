@@ -5,6 +5,8 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
+	"github.com/libp2p/go-libp2p-peer"
+	"github.com/tinychain/tinychain/p2p/pb"
 	"math/big"
 )
 
@@ -119,4 +121,16 @@ func HexToAddress(d string) Address {
 	}
 	hex.Decode(dec, h)
 	return BytesToAddress(dec)
+}
+
+// Protocol represents the callback handler
+type Protocol interface {
+	// Typ should match the message type
+	Type() string
+
+	// Run func handles the message from the stream
+	Run(pid peer.ID, message *pb.Message) error
+
+	// Error func handles the error returned from the stream
+	Error(error)
 }

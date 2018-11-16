@@ -291,8 +291,8 @@ func (eg *Engine) Finalize(header *types.Header, state *state.StateDB, txs types
 }
 
 // Protocols return protocols used from p2p layer to handle messages.
-func (eg *Engine) Protocols() []p2p.Protocol {
-	return []p2p.Protocol{
+func (eg *Engine) Protocols() []common.Protocol {
+	return []common.Protocol{
 		eg,
 		eg.peerPool,
 		eg.blockPool,

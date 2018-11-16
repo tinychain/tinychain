@@ -322,7 +322,7 @@ func (pow *ProofOfWork) broadcast(block *types.Block) error {
 	return nil
 }
 
-func (pow *ProofOfWork) Protocols() []p2p.Protocol {
+func (pow *ProofOfWork) Protocols() []common.Protocol {
 	return nil
 }
 
