@@ -21,13 +21,20 @@ var (
 	errParentNotExist       = errors.New("parent not exist")
 )
 
-type BlockValidator struct {
-	maxExtraLength uint64
-	chain          *chain.Blockchain
+type BlockValidator interface {
+	ValidateHeader(header *types.Header) error
+	ValidateHeaders(headers []*types.Header) (chan struct{}, chan error)
+	ValidateBody(b *types.Block) error
+	ValidateState(b *types.Block, state *state.StateDB, receipts types.Receipts) error
 }
 
-func NewBlockValidator(config *common.Config, chain *chain.Blockchain) *BlockValidator {
-	return &BlockValidator{
+type BlockValidatorImpl struct {
+	maxExtraLength uint64
+	chain          chain.Blockchain
+}
+
+func NewBlockValidator(config *common.Config, chain chain.Blockchain) *BlockValidatorImpl {
+	return &BlockValidatorImpl{
 		maxExtraLength: uint64(config.GetInt64(common.MAX_EXTRA_LENGTH)),
 		chain:          chain,
 	}
@@ -37,7 +44,7 @@ func NewBlockValidator(config *common.Config, chain *chain.Blockchain) *BlockVal
 // 1. check header already exist or not
 // 2. check parent exist or not
 // 3. check detail header info
-func (v *BlockValidator) ValidateHeader(header *types.Header) error {
+func (v *BlockValidatorImpl) ValidateHeader(header *types.Header) error {
 	//  TODO Check timestamp
 	if v.chain.GetHeader(header.Hash(), header.Height) != nil {
 		return nil
@@ -54,7 +61,7 @@ func (v *BlockValidator) ValidateHeader(header *types.Header) error {
 
 // ValidateHeaders validate headers in batch, used by sync-chain processing.
 // It returns two channels, one is to abort the validate process, and the other is to store errors。
-func (v *BlockValidator) ValidateHeaders(headers []*types.Header) (chan struct{}, chan error) {
+func (v *BlockValidatorImpl) ValidateHeaders(headers []*types.Header) (chan struct{}, chan error) {
 	workers := runtime.GOMAXPROCS(runtime.NumCPU())
 	if workers > len(headers) {
 		workers = len(headers)
@@ -114,7 +121,7 @@ func (v *BlockValidator) ValidateHeaders(headers []*types.Header) (chan struct{}
 // 2. Validate gasUsed and gasLimit
 // 3. Validate parentHash and height
 // 4. Validate extra data size is within bounds
-func (v *BlockValidator) validateHeader(parent, header *types.Header) error {
+func (v *BlockValidatorImpl) validateHeader(parent, header *types.Header) error {
 	if header.Time.Cmp(parent.Time) <= 0 {
 		return errTimestampInvalid
 	}
@@ -136,7 +143,7 @@ func (v *BlockValidator) validateHeader(parent, header *types.Header) error {
 // Validate block body
 // 1. Check block already exist in db or not
 // 1. Check transactions match tx root in header or not
-func (v *BlockValidator) ValidateBody(block *types.Block) error {
+func (v *BlockValidatorImpl) ValidateBody(block *types.Block) error {
 	if old := v.chain.GetBlockByHash(block.Hash()); old != nil {
 		return errBlockExist
 	}
@@ -151,7 +158,7 @@ func (v *BlockValidator) ValidateBody(block *types.Block) error {
 // 1. Validate receipts root hash
 // 2. Validate Bloom filter
 // 3. Validate state root
-func (v *BlockValidator) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error {
+func (v *BlockValidatorImpl) ValidateState(block *types.Block, state *state.StateDB, receipts types.Receipts) error {
 	receiptRoot := receipts.Hash()
 	if receiptRoot != block.ReceiptsHash() {
 		return errReceiptRootNotEqual

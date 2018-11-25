@@ -22,8 +22,19 @@ const (
 	headerCacheLimit = 2048
 )
 
-// Blockchain is the canonical chain given a database with a genesis block
-type Blockchain struct {
+type Blockchain interface {
+	Genesis() *types.Block
+	LastBlock() *types.Block      // Last block in memory
+	LastFinalBlock() *types.Block // Last irreversible block
+	GetBlockByHeight(height uint64) *types.Block
+	GetBlockByHash(hash common.Hash) *types.Block
+	GetHeader(hash common.Hash, height uint64) *types.Header
+	GetHeaderByHash(hash common.Hash) *types.Header
+	AddBlock(block *types.Block) error
+}
+
+// Ledger is the canonical blockchain given a database with a genesis block
+type Ledger struct {
 	db             *tdb.TinyDB  // chain db
 	genesis        *types.Block // genesis block
 	lastBlock      atomic.Value // last block of chain
@@ -34,10 +45,10 @@ type Blockchain struct {
 	headerCache *lru.Cache // headers lru cache
 }
 
-func NewBlockchain(db tdb.Database) (*Blockchain, error) {
+func NewBlockchain(db tdb.Database) (*Ledger, error) {
 	blockCache, _ := lru.New(blockCacheLimit)
 	headerCache, _ := lru.New(headerCacheLimit)
-	bc := &Blockchain{
+	bc := &Ledger{
 		db:          tdb.NewTinyDB(db),
 		blockCache:  blockCache,
 		headerCache: headerCache,
@@ -47,11 +58,11 @@ func NewBlockchain(db tdb.Database) (*Blockchain, error) {
 	return bc, nil
 }
 
-func (bc *Blockchain) Genesis() *types.Block {
+func (bc *Ledger) Genesis() *types.Block {
 	return bc.genesis
 }
 
-func (bc *Blockchain) SetGenesis(genesis *types.Block) error {
+func (bc *Ledger) SetGenesis(genesis *types.Block) error {
 	if bc.genesis != nil {
 		return errGenesisExist
 	}
@@ -67,12 +78,12 @@ func (bc *Blockchain) SetGenesis(genesis *types.Block) error {
 	return nil
 }
 
-// Reset init blockchain with genesis block
-func (bc *Blockchain) Reset() error {
+// Reset init Ledger with genesis block
+func (bc *Ledger) Reset() error {
 	return bc.ResetWithGenesis(bc.genesis)
 }
 
-func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
+func (bc *Ledger) ResetWithGenesis(genesis *types.Block) error {
 	batch := bc.db.LDB().NewBatch()
 	if err := bc.db.PutBlock(batch, genesis, false, false); err != nil {
 		log.Errorf("failed to put genesis into db, err:%s", err)
@@ -96,7 +107,7 @@ func (bc *Blockchain) ResetWithGenesis(genesis *types.Block) error {
 }
 
 // Purge drop the blocks in memory and revert the blockchain to the height of `lastFinalBlock`
-func (bc *Blockchain) Purge() {
+func (bc *Ledger) Purge() {
 	bc.mu.Lock()
 	defer bc.mu.Unlock()
 
@@ -105,12 +116,12 @@ func (bc *Blockchain) Purge() {
 	bc.headerCache.Purge()
 }
 
-func (bc *Blockchain) LastHeight() uint64 {
+func (bc *Ledger) LastHeight() uint64 {
 	return bc.LastBlock().Height()
 }
 
 // LastBlock returns the last block of latest blockchain in memory
-func (bc *Blockchain) LastBlock() *types.Block {
+func (bc *Ledger) LastBlock() *types.Block {
 	if block := bc.lastBlock.Load(); block != nil {
 		return block.(*types.Block)
 	}
@@ -120,7 +131,7 @@ func (bc *Blockchain) LastBlock() *types.Block {
 }
 
 // LastFinalBlock returns the last commited block in db
-func (bc *Blockchain) LastFinalBlock() *types.Block {
+func (bc *Ledger) LastFinalBlock() *types.Block {
 	if fb := bc.lastFinalBlock.Load(); fb != nil {
 		return fb.(*types.Block)
 	}
@@ -133,7 +144,7 @@ func (bc *Blockchain) LastFinalBlock() *types.Block {
 	return block
 }
 
-func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
+func (bc *Ledger) GetHeader(hash common.Hash, height uint64) *types.Header {
 	if header, ok := bc.headerCache.Get(hash); ok {
 		return header.(*types.Header)
 	}
@@ -145,7 +156,7 @@ func (bc *Blockchain) GetHeader(hash common.Hash, height uint64) *types.Header {
 	return header
 }
 
-func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {
+func (bc *Ledger) GetBlock(hash common.Hash, height uint64) *types.Block {
 	block, err := bc.db.GetBlock(height, hash)
 	if err != nil {
 		log.Errorf("failed to get block from db, err:%s", err)
@@ -155,7 +166,7 @@ func (bc *Blockchain) GetBlock(hash common.Hash, height uint64) *types.Block {
 	return block
 }
 
-func (bc *Blockchain) GetBlockByHeight(height uint64) *types.Block {
+func (bc *Ledger) GetBlockByHeight(height uint64) *types.Block {
 	hash, err := bc.db.GetHash(height)
 	if err != nil {
 		log.Errorf("failed to get hash from db, err:%s", err)
@@ -164,7 +175,7 @@ func (bc *Blockchain) GetBlockByHeight(height uint64) *types.Block {
 	return bc.GetBlock(hash, height)
 }
 
-func (bc *Blockchain) GetBlockByHash(hash common.Hash) *types.Block {
+func (bc *Ledger) GetBlockByHash(hash common.Hash) *types.Block {
 	if block, ok := bc.blockCache.Get(hash); ok {
 		return block.(*types.Block)
 	}
@@ -176,7 +187,7 @@ func (bc *Blockchain) GetBlockByHash(hash common.Hash) *types.Block {
 	return bc.GetBlock(hash, height)
 }
 
-func (bc *Blockchain) GetHash(height uint64) common.Hash {
+func (bc *Ledger) GetHash(height uint64) common.Hash {
 	hash, err := bc.db.GetHash(height)
 	if err != nil {
 		return common.Hash{}
@@ -184,7 +195,7 @@ func (bc *Blockchain) GetHash(height uint64) common.Hash {
 	return hash
 }
 
-func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
+func (bc *Ledger) GetHeaderByHash(hash common.Hash) *types.Header {
 	height, err := bc.db.GetHeight(hash)
 	if err != nil {
 		return nil
@@ -201,7 +212,7 @@ func (bc *Blockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 }
 
 // AddBlocks insert blocks in batch when importing outer blockchain
-func (bc *Blockchain) AddBlocks(blocks types.Blocks) error {
+func (bc *Ledger) AddBlocks(blocks types.Blocks) error {
 	for _, block := range blocks {
 		if err := bc.AddBlock(block); err != nil {
 			log.Errorf("failed to add block %s, err:%s", block.Hash(), err)
@@ -214,7 +225,7 @@ func (bc *Blockchain) AddBlocks(blocks types.Blocks) error {
 
 // AddBlock appends block into chain.
 // The blocks passed have been validated by block_pool.
-func (bc *Blockchain) AddBlock(block *types.Block) error {
+func (bc *Ledger) AddBlock(block *types.Block) error {
 	if blk := bc.GetBlockByHash(block.Hash()); blk != nil {
 		return errors.New(fmt.Sprintf("block %s exists in blockchain", blk.Hash().Hex()))
 	}
@@ -232,7 +243,7 @@ func (bc *Blockchain) AddBlock(block *types.Block) error {
 }
 
 // commit persist the block to db.
-func (bc *Blockchain) CommitBlock(batch tdb.Batch, block *types.Block) error {
+func (bc *Ledger) CommitBlock(batch tdb.Batch, block *types.Block) error {
 	// Put block to db.Batch
 	if err := bc.db.PutBlock(batch, block, false, false); err != nil {
 		log.Errorf("failed to put block %s in db, err:%s", block.Hash(), err)

@@ -1,12 +1,8 @@
 package tiny
 
 import (
-	"fmt"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/consensus"
-	"github.com/tinychain/tinychain/consensus/pow"
-	"github.com/tinychain/tinychain/consensus/solo"
-	"github.com/tinychain/tinychain/consensus/vrf_bft"
 	"github.com/tinychain/tinychain/core/chain"
 	"github.com/tinychain/tinychain/core/executor"
 	"github.com/tinychain/tinychain/core/state"
@@ -28,7 +24,7 @@ type Tiny struct {
 	executor *executor.Executor
 	state    *state.StateDB
 	network  *Network
-	chain    *chain.Blockchain
+	chain    chain.Blockchain
 	tinyDB   *db.TinyDB
 }
 
@@ -65,24 +61,13 @@ func New(config *common.Config) (*Tiny, error) {
 		state:   statedb,
 		tinyDB:  db.NewTinyDB(ldb),
 	}
-	engineName := config.GetString(common.EngineName)
-	blockValidator := executor.NewBlockValidator(config, bc)
-	txValidator := executor.NewTxValidator(config, statedb)
-	switch engineName {
-	case common.SoloEngine:
-		tiny.engine, err = solo.New(config, statedb, bc, blockValidator, txValidator)
-	case common.PowEngine:
-		tiny.engine, err = pow.New(config, statedb, bc, blockValidator, txValidator)
-	case common.VrfBftEngine:
-		tiny.engine, err = vrf_bft.New(config)
-	default:
-		return nil, fmt.Errorf("unknown consensus engine %s", engineName)
-	}
+
+	engine, err := consensus.New(config, statedb, bc)
 	if err != nil {
 		return nil, err
 	}
-
 	tiny.executor = executor.New(config, ldb, bc, tiny.engine)
+	tiny.engine = engine
 
 	return tiny, nil
 }
@@ -113,7 +98,7 @@ func (tiny *Tiny) DB() *db.TinyDB {
 	return tiny.tinyDB
 }
 
-func (tiny *Tiny) Chain() *chain.Blockchain {
+func (tiny *Tiny) Chain() chain.Blockchain {
 	return tiny.chain
 }
 

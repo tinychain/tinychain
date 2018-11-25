@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	chain *Blockchain
+	chain *Ledger
 	once  sync.Once
 )
 
-func initChain(bc *Blockchain) {
+func initChain(bc *Ledger) {
 	once.Do(func() {
 		if chain == nil {
 			chain = bc

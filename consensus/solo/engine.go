@@ -5,14 +5,15 @@ import (
 	"math/big"
 	"time"
 	"github.com/tinychain/tinychain/common"
-	"github.com/tinychain/tinychain/consensus"
-	"github.com/tinychain/tinychain/consensus/blockpool"
 	"github.com/tinychain/tinychain/core"
 	"github.com/tinychain/tinychain/core/state"
 	"github.com/tinychain/tinychain/core/txpool"
 	"github.com/tinychain/tinychain/core/types"
 	"github.com/tinychain/tinychain/event"
 	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/core/blockpool"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/executor"
 )
 
 var (
@@ -25,15 +26,11 @@ const (
 	REMOVE_THRESHOLD = 65535 // height threshold of clearing block pool
 )
 
-type Blockchain interface {
-	LastBlock() *types.Block
-}
-
 type SoloEngine struct {
 	config    *Config
-	chain     Blockchain
-	validator consensus.BlockValidator
-	blockPool *blockpool.BlockPool
+	chain     chain.Blockchain
+	validator executor.BlockValidator
+	blockPool blockpool.BlockPool
 	txPool    *txpool.TxPool
 	state     *state.StateDB
 	event     *event.TypeMux
@@ -52,12 +49,15 @@ type SoloEngine struct {
 	errSub       event.Subscription // listen for the executor's error event
 }
 
-func New(config *common.Config, state *state.StateDB, chain Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*SoloEngine, error) {
+func New(config *common.Config, state *state.StateDB, chain chain.Blockchain) (*SoloEngine, error) {
 	conf := newConfig(config)
+	blValidator := executor.NewBlockValidator(config, chain)
+	txValidator := executor.NewTxValidator(config, state)
 	soloEngine := &SoloEngine{
 		config:    conf,
 		event:     event.GetEventhub(),
 		chain:     chain,
+		validator: blValidator,
 		blockPool: blockpool.NewBlockPool(config, blValidator, nil, log, common.ProposeBlockMsg),
 	}
 

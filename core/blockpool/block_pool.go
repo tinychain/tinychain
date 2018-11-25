@@ -26,7 +26,13 @@ type ConsensusValidator interface {
 	Validate(block *types.Block) error
 }
 
-type BlockPool struct {
+type BlockPool interface {
+	GetBlock(height uint64) *types.Block
+	GetBlocks(height uint64) types.Blocks
+	UpdateChainHeight(height uint64)
+}
+
+type BlockPoolImpl struct {
 	maxBlockSize uint64
 	mu           sync.RWMutex
 	log          *logging.Logger
@@ -44,9 +50,9 @@ type BlockPool struct {
 
 // Create a block pool instance
 // The arg `msgType` tells the block pool to listen for the specified type of message from p2p layer
-func NewBlockPool(config *common.Config, blValidator consensus.BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPool {
+func NewBlockPool(config *common.Config, blValidator consensus.BlockValidator, csValidator ConsensusValidator, log *logging.Logger, msgType string) *BlockPoolImpl {
 	maxBlockSize := uint64(config.GetInt64(common.MAX_BLOCK_NUM))
-	bp := &BlockPool{
+	bp := &BlockPoolImpl{
 		maxBlockSize: maxBlockSize,
 		event:        event.GetEventhub(),
 		log:          log,
@@ -61,23 +67,23 @@ func NewBlockPool(config *common.Config, blValidator consensus.BlockValidator, c
 }
 
 // MsgType returns the msg type used in p2p layer
-func (bp *BlockPool) MsgType() string {
+func (bp *BlockPoolImpl) MsgType() string {
 	return bp.msgType
 }
 
-func (bp *BlockPool) GetBlock(height uint64) *types.Block {
+func (bp *BlockPoolImpl) GetBlock(height uint64) *types.Block {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
 	return bp.valid[height][0]
 }
 
-func (bp *BlockPool) GetBlocks(height uint64) types.Blocks {
+func (bp *BlockPoolImpl) GetBlocks(height uint64) types.Blocks {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
 	return bp.valid[height]
 }
 
-func (bp *BlockPool) isExist(block *types.Block) bool {
+func (bp *BlockPoolImpl) isExist(block *types.Block) bool {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
 	blks := bp.valid[block.Height()]
@@ -90,7 +96,7 @@ func (bp *BlockPool) isExist(block *types.Block) bool {
 }
 
 // AddBlocks add a new block to pool without validating and processing it
-func (bp *BlockPool) AddBlock(block *types.Block) error {
+func (bp *BlockPoolImpl) AddBlock(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	if bp.isExist(block) {
@@ -100,7 +106,7 @@ func (bp *BlockPool) AddBlock(block *types.Block) error {
 	return nil
 }
 
-func (bp *BlockPool) add(block *types.Block) error {
+func (bp *BlockPoolImpl) add(block *types.Block) error {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	if block.Height() <= bp.ChainHeight() {
@@ -136,12 +142,12 @@ func (bp *BlockPool) add(block *types.Block) error {
 
 // append push a new block to the given slot.
 // This func requires the caller to hold write-lock.
-func (bp *BlockPool) append(block *types.Block) {
+func (bp *BlockPoolImpl) append(block *types.Block) {
 	bp.valid[block.Height()] = append(bp.valid[block.Height()], block)
 }
 
 // DelBlock removes the block with given height.
-func (bp *BlockPool) DelBlock(block *types.Block) {
+func (bp *BlockPoolImpl) DelBlock(block *types.Block) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	blks := bp.valid[block.Height()]
@@ -154,7 +160,7 @@ func (bp *BlockPool) DelBlock(block *types.Block) {
 }
 
 // ClearByHeight removes the block whose height is lower than the given height
-func (bp *BlockPool) Clear(height uint64) {
+func (bp *BlockPoolImpl) Clear(height uint64) {
 	bp.mu.Lock()
 	defer bp.mu.Unlock()
 	for h := range bp.valid {
@@ -164,34 +170,34 @@ func (bp *BlockPool) Clear(height uint64) {
 	}
 }
 
-func (bp *BlockPool) ChainHeight() uint64 {
+func (bp *BlockPoolImpl) ChainHeight() uint64 {
 	if h := bp.chainHeight.Load(); h != nil {
 		return h.(uint64)
 	}
 	return 0
 }
 
-func (bp *BlockPool) UpdateChainHeight(height uint64) {
+func (bp *BlockPoolImpl) UpdateChainHeight(height uint64) {
 	bp.chainHeight.Store(height)
 	//bp.Clear(height)
 }
 
 // Size gets the size of valid blocks.
-func (bp *BlockPool) Size() uint64 {
+func (bp *BlockPoolImpl) Size() uint64 {
 	bp.mu.RLock()
 	defer bp.mu.RUnlock()
 	return uint64(len(bp.valid))
 }
 
-//func (bp *BlockPool) Stop() {
+//func (bp *BlockPoolImpl) Stop() {
 //	close(bp.quitCh)
 //}
 
-func (bp *BlockPool) Type() string {
+func (bp *BlockPoolImpl) Type() string {
 	return bp.msgType
 }
 
-func (bp *BlockPool) Run(pid peer.ID, message *pb.Message) error {
+func (bp *BlockPoolImpl) Run(pid peer.ID, message *pb.Message) error {
 	block := types.Block{}
 	err := json.Unmarshal(message.Data, &block)
 	if err != nil {
@@ -201,6 +207,6 @@ func (bp *BlockPool) Run(pid peer.ID, message *pb.Message) error {
 	return nil
 }
 
-func (bp *BlockPool) Error(err error) {
+func (bp *BlockPoolImpl) Error(err error) {
 	bp.log.Errorf("blockpool error: %s", err)
 }

@@ -29,11 +29,11 @@ type Processor interface {
 type Executor struct {
 	conf      *common.Config
 	db        *db.TinyDB
-	chain     *chain.Blockchain // Blockchain wrapper
+	chain     chain.Blockchain // Blockchain wrapper
 	state     *state.StateDB
 	engine    consensus.Engine
 	event     *event.TypeMux
-	validator *BlockValidator
+	validator BlockValidator
 	quitCh    chan struct{}
 
 	receiptsCache sync.Map     // Receipts cache, map[uint64]types.Receipts
@@ -49,7 +49,7 @@ type Executor struct {
 	rollbackSub     event.Subscription // Subscribe rollback event
 }
 
-func New(config *common.Config, database db.Database, chain *chain.Blockchain, engine consensus.Engine) *Executor {
+func New(config *common.Config, database db.Database, chain chain.Blockchain, engine consensus.Engine) *Executor {
 	executor := &Executor{
 		conf:      config,
 		db:        db.NewTinyDB(database),

@@ -10,14 +10,15 @@ import (
 	"sync/atomic"
 	"time"
 	"github.com/tinychain/tinychain/common"
-	"github.com/tinychain/tinychain/consensus"
-	"github.com/tinychain/tinychain/consensus/blockpool"
 	"github.com/tinychain/tinychain/core"
 	"github.com/tinychain/tinychain/core/state"
 	"github.com/tinychain/tinychain/core/txpool"
 	"github.com/tinychain/tinychain/core/types"
 	"github.com/tinychain/tinychain/event"
 	"github.com/tinychain/tinychain/p2p"
+	"github.com/tinychain/tinychain/core/chain"
+	"github.com/tinychain/tinychain/core/executor"
+	"github.com/tinychain/tinychain/core/blockpool"
 )
 
 var (
@@ -44,14 +45,14 @@ func (ci *consensusInfo) Serialize() ([]byte, error) {
 type ProofOfWork struct {
 	config           *Config
 	event            *event.TypeMux
-	chain            consensus.Blockchain
+	chain            chain.Blockchain
 	state            *state.StateDB
-	blockPool        *blockpool.BlockPool
+	blockPool        blockpool.BlockPool
 	txPool           *txpool.TxPool
-	blValidator      consensus.BlockValidator // block validator
-	csValidator      *csValidator             // consensus validator
-	blockNum         uint64                   // new block num at certain difficulty period
-	currMiningHeader *types.Header            // block header that being mined currently
+	blValidator      executor.BlockValidator // block validator
+	csValidator      *csValidator            // consensus validator
+	blockNum         uint64                  // new block num at certain difficulty period
+	currMiningHeader *types.Header           // block header that being mined currently
 
 	address common.Address
 	privKey crypto.PrivKey
@@ -71,19 +72,19 @@ type ProofOfWork struct {
 	errSub       event.Subscription // listen for the executor's error event
 }
 
-func New(config *common.Config, state *state.StateDB, chain consensus.Blockchain, blValidator consensus.BlockValidator, txValidator consensus.TxValidator) (*ProofOfWork, error) {
+func New(config *common.Config, state *state.StateDB, chain chain.Blockchain) (*ProofOfWork, error) {
 	conf := newConfig(config)
-
 	csValidator := newCsValidator(chain)
-
+	blValidator := executor.NewBlockValidator(config, chain)
+	txValidator := executor.NewTxValidator(config, state)
 	pow := &ProofOfWork{
 		config:      conf,
 		chain:       chain,
 		state:       state,
-		blValidator: blValidator,
-		csValidator: csValidator,
 		event:       event.GetEventhub(),
 		quitCh:      make(chan struct{}),
+		blValidator: blValidator,
+		csValidator: csValidator,
 		blockPool:   blockpool.NewBlockPool(config, blValidator, csValidator, log, common.ProposeBlockMsg),
 	}
 
