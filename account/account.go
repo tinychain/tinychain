@@ -1,9 +1,9 @@
 package account
 
 import (
-	"github.com/tinychain/tinychain/common"
-	"github.com/libp2p/go-libp2p-crypto"
 	"errors"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/crypto"
 )
 
 var (
@@ -22,7 +22,7 @@ type Account struct {
 }
 
 // New account by private key
-func NewAccountWithKey(privKey crypto.PrivKey) (*Account, error) {
+func NewAccountWithKey(privKey crypto.PrivateKey) (*Account, error) {
 	key := &Key{privKey, privKey.GetPublic()}
 	addr, err := common.GenAddrByPrivkey(privKey)
 	if err != nil {
@@ -44,10 +44,10 @@ func NewAccount() (*Account, error) {
 	return &Account{addr, key}, nil
 }
 
-func (ac *Account) PrivKey() crypto.PrivKey {
+func (ac *Account) PrivKey() crypto.PrivateKey {
 	return ac.key.privKey
 }
 
-func (ac *Account) PubKey() crypto.PubKey {
+func (ac *Account) PubKey() crypto.PublicKey {
 	return ac.key.pubKey
 }

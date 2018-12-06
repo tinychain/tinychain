@@ -1,14 +1,14 @@
 package types
 
 import (
-	"github.com/tinychain/tinychain/common"
-	"math/big"
-	"sync/atomic"
-	json "github.com/json-iterator/go"
+	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"github.com/libp2p/go-libp2p-crypto"
-	"bytes"
+	json "github.com/json-iterator/go"
+	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/crypto"
+	"math/big"
+	"sync/atomic"
 )
 
 // BNonce is a 64-bit hash which proves that a sufficient amount of
@@ -157,7 +157,7 @@ func (bl *Block) Size() uint64 {
 	return uint64(len(tmp))
 }
 
-func (bl *Block) Sign(priv crypto.PrivKey) ([]byte, error) {
+func (bl *Block) Sign(priv crypto.PrivateKey) ([]byte, error) {
 	hash := bl.Hash()
 	s, err := priv.Sign(hash.Bytes())
 	if err != nil {

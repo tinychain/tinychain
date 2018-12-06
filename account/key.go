@@ -1,25 +1,24 @@
 package account
 
 import (
-	"github.com/libp2p/go-libp2p-crypto"
-	"crypto/rand"
 	"github.com/tinychain/tinychain/common"
+	"github.com/tinychain/tinychain/crypto"
 )
 
 type Key struct {
-	privKey crypto.PrivKey
-	pubKey crypto.PubKey
+	privKey crypto.PrivateKey
+	pubKey  crypto.PublicKey
 }
 
 func NewKeyPairs() (*Key, error) {
-	priv, pub, err := crypto.GenerateSecp256k1Key(rand.Reader)
+	priv, pub, err := crypto.NewKeyPair()
 	if err != nil {
 		return nil, err
 	}
 	return &Key{priv, pub}, nil
 }
 
-func validatePrivKey(address common.Address, priv crypto.PrivKey) bool {
+func validatePrivKey(address common.Address, priv crypto.PrivateKey) bool {
 	addr, err := common.GenAddrByPrivkey(priv)
 	if err != nil {
 		return false

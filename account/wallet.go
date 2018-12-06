@@ -1,11 +1,11 @@
 package account
 
 import (
-	"github.com/libp2p/go-libp2p-crypto"
 	"github.com/pkg/errors"
-	"sync"
 	"github.com/tinychain/tinychain/common"
 	"github.com/tinychain/tinychain/core/types"
+	"github.com/tinychain/tinychain/crypto"
+	"sync"
 )
 
 type Wallet interface {
@@ -60,7 +60,7 @@ func (tw *TinyWallet) CreateAccount() (*Account, error) {
 }
 
 // Lock the account
-func (tw *TinyWallet) Lock(address common.Address, priv crypto.PrivKey) error {
+func (tw *TinyWallet) Lock(address common.Address, priv crypto.PrivateKey) error {
 	tw.mu.Lock()
 	defer tw.mu.Unlock()
 	if validatePrivKey(address, priv) {
@@ -76,7 +76,7 @@ func (tw *TinyWallet) Lock(address common.Address, priv crypto.PrivKey) error {
 }
 
 // Unlock the account, register key in wallet
-func (tw *TinyWallet) Unlock(address common.Address, key crypto.PrivKey) error {
+func (tw *TinyWallet) Unlock(address common.Address, key crypto.PrivateKey) error {
 	tw.mu.RLock()
 	if _, exist := tw.unlocked[address]; exist {
 		return nil
